@@ -18,10 +18,13 @@ createDiffEpa <- function(x, h = 1)
 
 nwsmooth <- function(x, y, h = 1)
 {
+    nobs      <- NROW(x)
     diffmat   <- createDiffEpa(x, h = h)
     diffmat@x <- Kepanechnikov2(diffmat@x) / h
     predicted.values <- colSums(y * diffmat) / colSums(diffmat)
-    list(fitted = predicted.values)
+    trS <- sum(diag(diffmat))
+    gcv <- (1 / nobs) * sum(( (y - predicted.values) / (1 - trS / nobs) ) ^ 2)
+    list(fitted = predicted.values, gcv = gcv)
 }
 
 nwsmoothcov <- function(x, y, h = 1)
@@ -30,6 +33,7 @@ nwsmoothcov <- function(x, y, h = 1)
     diffmat   <- createDiffEpa(y, h = h)
     diffmat@x <- Kepanechnikov2(diffmat@x) / h
     txpy <- predicted.values <- vector(mode = "list", length = nobs)
+    trS <- sum(diag(diffmat))
 
     csums <- colSums(diffmat)
     for (i in 1:nobs) txpy[[i]] <- tcrossprod(x[i,])
@@ -40,7 +44,13 @@ nwsmoothcov <- function(x, y, h = 1)
 
         predicted.values[[i]] <- sum.cov / csums[i]
     }
-    list(fitted = predicted.values)
+
+    normdiff <- 0
+    for (j in 1:nobs) normdiff <- normdiff + norm(txpy[[j]] - predicted.values[[j]], type = "F")
+
+    gcv <- (1 / nobs) * ((normdiff / (1 - trS / nobs)) ^ 2)
+
+    list(fitted = predicted.values, gcv = gcv)
 }
 
 
