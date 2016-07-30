@@ -22,7 +22,7 @@ y <- sin(apply(x, 1, function(xr) exp( (xr[1] + xr[2])^2 ))) +
 ordy <- order(y)
 
 
-bandwidths <- exp(seq(log(0.25), log(30), length.out = 25))
+bandwidths <- exp(seq(log(0.25), log(30), length.out = 25))[10:25]
 nw.cov.fits <- vector(mode = "list", length = length(bandwidths))
 for (b in 1:length(bandwidths)) nw.cov.fits[[b]] <- nwsmoothcov(x = x, y = y, h = bandwidths[b])
 gcvs.cov <- sapply(nw.cov.fits, function(f) f$gcv)

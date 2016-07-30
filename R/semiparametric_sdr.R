@@ -39,8 +39,8 @@ nwsmoothcov <- function(x, y, h = 1)
     for (i in 1:nobs) txpy[[i]] <- tcrossprod(x[i,])
     for (i in 1:nobs)
     {
-        sum.cov <- txpy[[1]] * diffmat[i,1]
-        for (j in 2:nobs) sum.cov <- sum.cov + txpy[[j]] * diffmat[i,j]
+        sum.cov <- txpy[[1]] * diffmat[1,i]
+        for (j in 2:nobs) sum.cov <- sum.cov + txpy[[j]] * diffmat[j,i]
 
         predicted.values[[i]] <- sum.cov / csums[i]
     }
