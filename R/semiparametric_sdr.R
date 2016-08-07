@@ -53,4 +53,8 @@ nwsmoothcov <- function(x, y, h = 1)
     list(fitted = predicted.values, gcv = gcv)
 }
 
+directional.regression <- function(x, y, d = 5L)
+{
+
+}
 
