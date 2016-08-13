@@ -40,50 +40,9 @@ plot(x = y[ordy], y = cov2plot, type = "b")
 
 
 
-sir <- function(x, y, h = 10L, d = 5L, slice.ind = NULL)
-{
-    cov <- cov(x)
-    eig.cov <- eigen(cov)
-    sqrt.inv.cov <- eig.cov$vectors %*% diag(1 / sqrt(eig.cov$values)) %*% t(eig.cov$vectors)
-    x.tilde <- scale(x, scale = FALSE) %*% sqrt.inv.cov
-
-    if (is.null(slice.ind))
-    {
-        quantiles <- quantile(y, probs = seq(0, 1, length.out = h+1))
-        quantiles[1] <- quantiles[1] - 1e-5
-        quantiles[length(quantiles)] <- quantiles[length(quantiles)] + 1e-5
-        y.cut <- cut(y, quantiles)
-        p.hat <- sapply(levels(y.cut), function(lv) mean(y.cut == lv))
-
-        x.h <- t(sapply(levels(y.cut), function(lv) colMeans(x.tilde[y.cut == lv,])))
-    } else
-    {
-        lvls <- sort(unique(slice.ind))
-        p.hat <- sapply(lvls, function(lv) mean(slice.ind == lv))
-        x.h <- t(sapply(lvls, function(lv) colMeans(x.tilde[slice.ind == lv,])))
-    }
-
-    V.hat <- crossprod(x.h, p.hat * x.h)
-    eig.V <- eigen(V.hat)
-    eta.hat <- eig.V$vectors[,1:d]
-    beta.hat <- t(t(eta.hat) %*% sqrt.inv.cov)
-    list(beta.hat = beta.hat, eta.hat = eta.hat)
-}
 
 
-phd <- function(x, y, d = 5L)
-{
-    cov <- cov(x)
-    eig.cov <- eigen(cov)
-    sqrt.inv.cov <- eig.cov$vectors %*% diag(1 / sqrt(eig.cov$values)) %*% t(eig.cov$vectors)
-    x.tilde <- scale(x, scale = FALSE) %*% sqrt.inv.cov
 
-    V.hat <- crossprod(x.tilde, drop(scale(y, scale = FALSE)) * x.tilde) / nrow(x)
-    eig.V <- eigen(V.hat)
-    eta.hat <- eig.V$vectors[,1:d]
-    beta.hat <- t(t(eta.hat) %*% sqrt.inv.cov)
-    list(beta.hat = beta.hat, eta.hat = eta.hat, M = V.hat, cov = cov, sqrt.inv.cov = sqrt.inv.cov)
-}
 
 
 hier.sir <- function(x.list, y, h = 10L, d = 2L, slice.ind = NULL)
@@ -264,24 +223,127 @@ beta.hat2$beta.hat
 
 
 set.seed(123)
-nobs <- 100
-x.list <- replicate(3, list(matrix(rnorm(nobs * 70), ncol = 70)))
+nobs <- 1000
+nobs.test <- 1e4
+nvars <- 20
+x.list      <- replicate(3, list(matrix(rnorm(nobs * nvars), ncol = nvars)))
+x.list.test <- replicate(3, list(matrix(rnorm(nobs.test * nvars), ncol = nvars)))
 x <- bdiag(x.list)
+x.test <- as.matrix(bdiag(x.list.test))
 y <- (apply(x, 1, function(xr) sum( (xr[1] + xr[2])^2 ))) +
-    sum(apply(x, 1, function(xr) ( (xr[3] + xr[4])^2 ))) +
-    (apply(x, 1, function(xr) ( sum(cos(xr[5:min(length(xr), 40)]) ^ 2) ))) +
+    apply(x, 1, function(xr) sum(( (xr[3] + xr[4])^2 ))) +
+    (apply(x, 1, function(xr) ( sum(0.25 * (xr[5:min(nvars, 10)]) ^ 2) ))) +
     rnorm(nobs * length(x.list), sd = 3.25)
 
-y <- as.vector(sapply(x.list, function(xx) (apply(xx, 1, function(xr) sum( (xr[1] + xr[2])^2 ))) +
-    sum(apply(xx, 1, function(xr) ( (xr[3] + xr[4])^2 ))) +
-    (apply(xx, 1, function(xr) ( sum(cos(xr[5:min(length(xr), 40)]) ^ 2) ))) +
-    rnorm(nobs, sd = 3.25)))
+y.true <- as.vector(sapply(x.list, function(xx) (apply(xx, 1, function(xr) -0.25 * sum( (xr[1] + xr[2])^2 ))) +
+    apply(xx, 1, function(xr) -0.25 * (sum(( (xr[3] + xr[4])^2 )))) +
+    (apply(xx, 1, function(xr) ( 2 * cos(sum(0.25 * (xr[5:min(nvars, 20)]) ^ 2)) )))
+    ))
+y.true[(nobs * 2 + 1):(nobs * 3)] <- y.true[(nobs * 2 + 1):(nobs * 3)] +
+    (apply(x.list[[3]], 1, function(xr) ( -1 * (sin(sum(0.1 * (xr[1:5]) ^ 3)) ) )))
+y <- y.true + rnorm(nobs, sd = 0.5)
+
+y.true.test <- as.vector(sapply(x.list.test, function(xx) (apply(xx, 1, function(xr) -0.25 * sum( (xr[1] + xr[2])^2 ))) +
+                                    apply(xx, 1, function(xr) -0.25 * (sum(( (xr[3] + xr[4])^2 )))) +
+                                    (apply(xx, 1, function(xr) ( 2 * cos(sum(0.25 * (xr[5:min(nvars, 20)]) ^ 2)) )))
+))
+y.true.test[(nobs.test * 2 + 1):(nobs.test * 3)] <- y.true.test[(nobs.test * 2 + 1):(nobs.test * 3)] +
+    (apply(x.list.test[[3]], 1, function(xr) ( -1 * (sin(sum(0.1 * (xr[1:5]) ^ 3) )) )))
+y.test <- y.true.test + rnorm(nobs.test, sd = 0.5)
+
+sd(y.true) / 2
 
 ordy <- order(y)
 
 hier.sdr     <- hier.sir(x.list, y,  d = 2)
 hier.sdr.phd <- hier.phd(x.list, y,  d = 2)
+sdr.sir      <- sir(as.matrix(x), y, d = 2 * 3, h = 20L)
 sdr.phd      <- phd(as.matrix(x), y, d = 2 * 3)
+
+
+directions.sir      <- as.matrix(x %*% Re(hier.sdr$beta.hat))
+directions.sir.test <- as.matrix(x.test %*% Re(hier.sdr$beta.hat))
+directions.phd      <- as.matrix(x %*% Re(hier.sdr.phd$beta.hat))
+directions.phd.test <- as.matrix(x.test %*% Re(hier.sdr.phd$beta.hat))
+dir.phd.non.hier      <- as.matrix(x %*% Re(sdr.phd$beta.hat))
+dir.phd.non.hier.test <- as.matrix(x.test %*% Re(sdr.phd$beta.hat))
+dir.sir.non.hier      <- as.matrix(x %*% Re(sdr.sir$beta.hat))
+dir.sir.non.hier.test <- as.matrix(x.test %*% Re(sdr.sir$beta.hat))
+
+library(randomForest)
+
+rf.phd.hier <- randomForest(x = directions.phd, y = y, ntree = 1000)
+rf.sir.hier <- randomForest(x = directions.sir, y = y, ntree = 1000)
+
+summary(lmsir1  <- lm(y ~ directions.sir ))
+summary(lmsir   <- lm(y ~ directions.sir + I(directions.sir ^ 2)))
+summary(lmphd1  <- lm(y ~ directions.phd ))
+summary(lmphd   <- lm(y ~ directions.phd + I(directions.phd ^ 2)))
+summary(lmphdnh <- lm(y ~ dir.phd.non.hier + I(dir.phd.non.hier ^ 2)))
+summary(lmshdnh <- lm(y ~ dir.sir.non.hier + I(dir.sir.non.hier ^ 2)))
+
+summary(lmsir3   <- lm(y ~ directions.sir + I(directions.sir ^ 2) + I(directions.sir ^ 3)))
+summary(lmphd3   <- lm(y ~ directions.phd + I(directions.phd ^ 2) + I(directions.phd ^ 3)))
+summary(lmphdnh3 <- lm(y ~ dir.phd.non.hier + I(dir.phd.non.hier ^ 2) + I(dir.phd.non.hier ^ 3)))
+summary(lmshdnh3 <- lm(y ~ dir.sir.non.hier + I(dir.sir.non.hier ^ 2) + I(dir.sir.non.hier ^ 3)))
+
+preds.sir1 <- cbind(1, directions.sir.test) %*% coef(lmsir1)
+preds.sir  <- cbind(1, directions.sir.test, directions.sir.test ^ 2) %*% coef(lmsir)
+preds.sir3 <- cbind(1, directions.sir.test, directions.sir.test ^ 2, directions.sir.test ^ 3) %*% coef(lmsir3)
+preds.phd1 <- cbind(1, directions.phd.test) %*% coef(lmphd1)
+preds.phd  <- cbind(1, directions.phd.test, directions.phd.test ^ 2) %*% coef(lmphd)
+preds.phd3 <- cbind(1, directions.phd.test, directions.phd.test ^ 2, directions.phd.test ^ 3) %*% coef(lmphd3)
+preds.phd.nh  <- cbind(1, dir.phd.non.hier.test, dir.phd.non.hier.test ^ 2) %*% coef(lmphdnh)
+preds.phd.nh3 <- cbind(1, dir.phd.non.hier.test, dir.phd.non.hier.test ^ 2, dir.phd.non.hier.test ^ 3) %*% coef(lmphdnh3)
+preds.sir.nh  <- cbind(1, dir.sir.non.hier.test, dir.sir.non.hier.test ^ 2) %*% coef(lmshdnh)
+preds.sir.nh3 <- cbind(1, dir.sir.non.hier.test, dir.sir.non.hier.test ^ 2, dir.sir.non.hier.test ^ 3) %*% coef(lmshdnh3)
+
+
+datx   <- as.matrix(cbind(x, x ^ 2))
+datxte <- as.matrix(cbind(x.test, x.test ^ 2))
+library(glmnet)
+
+glmn <- cv.glmnet(y = y, x = datx)
+
+lm.all <- lm(y ~ as.matrix(x))
+
+lm.all.preds <- cbind(1, as.matrix(x.test) ) %*% coef(lm.all)
+glmnet.preds <- predict(glmn, newx = datxte, s = "lambda.min")
+rf.preds.phd.hier <- predict(rf.phd.hier, directions.phd.test)
+rf.preds.sir.hier <- predict(rf.sir.hier, directions.sir.test)
+
+##oracle
+1 - mean((y.test - y.true.test) ^ 2) / mean((y.test - mean(y.test)) ^ 2)
+#lm
+1 - mean((y.test - lm.all.preds) ^ 2) / mean((y.test - mean(y.test)) ^ 2)
+1 - mean((y.test - glmnet.preds) ^ 2) / mean((y.test - mean(y.test)) ^ 2)
+
+# sir
+#1 - mean((y.test - preds.sir1) ^ 2) / mean((y.test - mean(y.test)) ^ 2)
+1 - mean((y.test - preds.sir) ^ 2) / mean((y.test - mean(y.test)) ^ 2)
+1 - mean((y.test - preds.sir3) ^ 2) / mean((y.test - mean(y.test)) ^ 2)
+1 - mean((y.test - rf.preds.sir.hier) ^ 2) / mean((y.test - mean(y.test)) ^ 2)
+# phd
+#1 - mean((y.test - preds.phd1) ^ 2) / mean((y.test - mean(y.test)) ^ 2)
+1 - mean((y.test - preds.phd) ^ 2) / mean((y.test - mean(y.test)) ^ 2)
+1 - mean((y.test - preds.phd3) ^ 2) / mean((y.test - mean(y.test)) ^ 2)
+1 - mean((y.test - rf.preds.phd.hier) ^ 2) / mean((y.test - mean(y.test)) ^ 2)
+# non hierarchical versions
+1 - mean((y.test - preds.sir.nh) ^ 2) / mean((y.test - mean(y.test)) ^ 2)
+1 - mean((y.test - preds.sir.nh3) ^ 2) / mean((y.test - mean(y.test)) ^ 2)
+#
+1 - mean((y.test - preds.phd.nh) ^ 2) / mean((y.test - mean(y.test)) ^ 2)
+1 - mean((y.test - preds.phd.nh3) ^ 2) / mean((y.test - mean(y.test)) ^ 2)
+
+
+
+
+
+anova(lmsir3, lmsir)
+anova(lmphd3, lmphd)
+anova(lmphdnh3, lmphdnh)
+
+
 
 beta.c     <- t(hier.sdr$beta.hat) %*% hier.sdr$cov %*% hier.sdr$beta.hat
 beta.c.phd <- t(hier.sdr.phd$beta.hat) %*% hier.sdr.phd$cov %*% hier.sdr.phd$beta.hat
@@ -289,22 +351,6 @@ beta.c.phd <- t(hier.sdr.phd$beta.hat) %*% hier.sdr.phd$cov %*% hier.sdr.phd$bet
 round(beta.c, 4)
 round(beta.c.phd, 4)
 
-
-directions.sir   <- as.matrix(x %*% Re(hier.sdr$beta.hat))
-directions.phd   <- as.matrix(x %*% Re(hier.sdr.phd$beta.hat))
-dir.phd.non.hier <- as.matrix(x %*% Re(sdr.phd$beta.hat))
-
-summary(lmsir   <- lm(y ~ directions.sir + I(directions.sir ^ 2)))
-summary(lmphd   <- lm(y ~ directions.phd + I(directions.phd ^ 2)))
-summary(lmphdnh <- lm(y ~ dir.phd.non.hier + I(dir.phd.non.hier ^ 2)))
-
-summary(lmsir3   <- lm(y ~ directions.sir + I(directions.sir ^ 2) + I(directions.sir ^ 3)))
-summary(lmphd3   <- lm(y ~ directions.phd + I(directions.phd ^ 2) + I(directions.phd ^ 3)))
-summary(lmphdnh3 <- lm(y ~ dir.phd.non.hier + I(dir.phd.non.hier ^ 2) + I(dir.phd.non.hier ^ 3)))
-
-anova(lmsir3, lmsir)
-anova(lmphd3, lmphd)
-anova(lmphdnh3, lmphdnh)
 
 beta.t <- matrix(rnorm(ncol(x) * 6), ncol = 6)
 yy <- x %*% beta.t + matrix(rnorm(nrow(x) * 6), ncol = 6)
