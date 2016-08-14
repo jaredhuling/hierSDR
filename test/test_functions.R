@@ -129,8 +129,9 @@ hier.phd <- function(x.list, y, d = 2L)
     list(beta.hat = do.call(cbind, beta.list), cov = cov, sqrt.inv.cov = sqrt.inv.cov)
 }
 
-beta.hat     <- sir(x, y, h = 20, d = 40)
-beta.hat.phd <- phd(x, y, d = 40)
+beta.hat      <- sir(x, y, h = 20, d = 40)
+beta.hat.phd  <- phd(x, y, d = 40)
+beta.hat.sphd <- semi.phd(x, y, d = 4, h = seq(1, 2, length.out = 50))
 
 plot(x = (x %*% beta.hat$beta.hat)[,1], y = y)
 plot(x = (x %*% beta.hat$beta.hat)[,2], y = y)
