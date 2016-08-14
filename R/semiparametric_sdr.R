@@ -81,13 +81,17 @@ phd <- function(x, y, d = 5L)
     beta.hat <- t(t(eta.hat) %*% sqrt.inv.cov)
     list(beta.hat = beta.hat, eta.hat = eta.hat, M = V.hat, cov = cov, sqrt.inv.cov = sqrt.inv.cov)
 }
-
-semi.phd <- function(x, y, d = 5L, maxit = 10L, h = NULL)
+semi.phd2 <- function(x, y, d = 5L, maxit = 10L, h = NULL)
 {
-    phd.mod <- phd(x = x, y = y, d = d)
-    cov          <- phd.mod$cov
-    sqrt.inv.cov <- phd.mod$sqrt.inv.cov
-    beta         <- phd.mod$beta.hat
+    cov <- cov(x)
+    eig.cov <- eigen(cov)
+    sqrt.inv.cov <- eig.cov$vectors %*% diag(1 / sqrt(eig.cov$values)) %*% t(eig.cov$vectors)
+    x.tilde <- scale(x, scale = FALSE) %*% sqrt.inv.cov
+
+    V.hat <- crossprod(x.tilde, drop(scale(y, scale = FALSE)) * x.tilde) / nrow(x)
+    eig.V <- eigen(V.hat)
+    beta  <- eig.V$vectors[,1:d]
+    beta.init <- beta
     if (is.null(h))
     {
         h <- exp(seq(log(0.1), log(25), length.out = 100))
@@ -95,9 +99,9 @@ semi.phd <- function(x, y, d = 5L, maxit = 10L, h = NULL)
 
     est.eqn <- function(beta.vec)
     {
-        beta.mat   <- matrix(beta.vec, ncol = d)
+        beta.mat   <- rbind(diag(d), matrix(beta.vec, ncol = d))
         directions <- x %*% beta
-        gcv.vals   <- sapply(h, function(hv) gcv(x = directions, y = y, alpha = hv))
+        gcv.vals   <- sapply(h, function(hv) gcv(x = directions, y = y, alpha = hv)[4])
         best.h     <- h[which.min(gcv.vals)]
         locfit.mod <- locfit.raw(x = directions, y = y, alpha = best.h)
 
@@ -109,12 +113,92 @@ semi.phd <- function(x, y, d = 5L, maxit = 10L, h = NULL)
         lhs
     }
 
-    slver <- optim(par = as.vector(beta),
-                   fn = est.eqn,
-                   method = "BFGS",
-                   control = list(maxit = maxit))
+    #  beta[(d+1):nrow(beta),]
+    objective <- numeric(maxit)
+    for (i in 1:maxit)
+    {
+        directions <- x.tilde %*% beta
+        gcv.vals   <- sapply(h, function(hv) gcv(x = directions, y = y, alpha = hv)[4])
+        best.h     <- h[which.min(gcv.vals)]
+        locfit.mod <- locfit.raw(x = directions, y = y, alpha = best.h)
 
-    beta.semi <- matrix(slver$par, ncol = d)
+
+        resid <- y - fitted(locfit.mod)
+
+        V.hat <- crossprod(x.tilde, resid * x.tilde) / nrow(x)
+        eig.V <- eigen(V.hat)
+        beta  <- eig.V$vectors[,1:d]
+
+        objective[i] <- norm(V.hat, type = "F") ^ 2
+    }
+
+    beta.hat  <- t(t(beta) %*% sqrt.inv.cov)
+    beta.init <- t(t(beta.init) %*% sqrt.inv.cov)
+
+    list(beta = beta.hat, beta.init = beta.init, objective = objective,
+         M = V.hat, cov = cov, sqrt.inv.cov = sqrt.inv.cov)
+}
+
+
+
+semi.phd <- function(x, y, d = 5L, maxit = 10L, h = NULL)
+{
+    cov <- cov(x)
+    eig.cov <- eigen(cov)
+    sqrt.inv.cov <- eig.cov$vectors %*% diag(1 / sqrt(eig.cov$values)) %*% t(eig.cov$vectors)
+    x.tilde <- scale(x, scale = FALSE) %*% sqrt.inv.cov
+
+    V.hat <- crossprod(x.tilde, drop(scale(y, scale = FALSE)) * x.tilde) / nrow(x)
+    eig.V <- eigen(V.hat)
+    beta  <- eig.V$vectors[,1:d]
+
+    nobs         <- nrow(x)
+    if (is.null(h))
+    {
+        h <- exp(seq(log(0.1), log(25), length.out = 100))
+    }
+
+    est.eqn <- function(beta.vec)
+    {
+        beta.mat   <- rbind(diag(d), matrix(beta.vec, ncol = d))
+        directions <- x.tilde %*% beta
+        gcv.vals   <- sapply(h, function(hv) gcv(x = directions, y = y, alpha = hv)[4])
+        best.h     <- h[which.min(gcv.vals)]
+        locfit.mod <- locfit.raw(x = directions, y = y, alpha = best.h)
+
+
+        Ey.given.xbeta <- fitted(locfit.mod)
+
+        resid <- y - Ey.given.xbeta
+        lhs   <- norm(crossprod(x.tilde, resid * x.tilde), type = "F") ^ 2
+        lhs
+    }
+
+    #  beta[(d+1):nrow(beta),]
+
+    init <- rep(1, length(as.vector(beta[(d+1):nrow(beta),])) )
+
+
+    #slver <- BBoptim(par = init,
+    #               fn = est.eqn,
+    #               method = "SANN",
+    #               control = list(maxit = maxit,
+    #                              maxfeval = maxit * 25))
+
+    slver <-   optim(par     = beta[(d+1):nrow(beta),],
+                     fn      = est.eqn,
+                     method  = "SANN",
+                     control = list(maxit = maxit))
+
+    beta.semi <- rbind(diag(d), matrix(slver$par, ncol = d))
+
+    beta.semi <- t(t(beta.semi) %*% sqrt.inv.cov)
+
+    for (i in 1:maxit)
+    {
+
+    }
+
     #for (i in 1:maxit)
     #{
         #beta.prev  <- beta
@@ -125,7 +209,8 @@ semi.phd <- function(x, y, d = 5L, maxit = 10L, h = NULL)
 
         #Ey.given.xbeta <- fitted(locfit.mod)
     #}
-    list(beta = beta.semi, beta.init = beta, solver.obj = slver)
+    list(beta = beta.semi, beta.init = beta, solver.obj = slver,
+         cov = cov, sqrt.inv.cov = sqrt.inv.cov)
 }
 
 

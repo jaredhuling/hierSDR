@@ -131,7 +131,10 @@ hier.phd <- function(x.list, y, d = 2L)
 
 beta.hat      <- sir(x, y, h = 20, d = 40)
 beta.hat.phd  <- phd(x, y, d = 40)
-beta.hat.sphd <- semi.phd(x, y, d = 4, h = seq(1, 2, length.out = 50))
+beta.hat.sphd <- semi.phd(x, y, d = 4, h = seq(1, 25, length.out = 50))
+beta.hat.sphd <- semi.phd2(x, y, d = 3, h = seq(1, 25, length.out = 50), maxit = 10)
+
+plot(beta.hat.sphd$objective)
 
 plot(x = (x %*% beta.hat$beta.hat)[,1], y = y)
 plot(x = (x %*% beta.hat$beta.hat)[,2], y = y)
@@ -156,10 +159,12 @@ apply(x %*% beta.hat$beta.hat, 2, function(xx) cor(xx, y))
 
 apply(x %*% dr.phd$evectors,       2, function(xx) cor(xx, y))[1:ncol(beta.hat.phd$beta.hat)]
 apply(x %*% beta.hat.phd$beta.hat, 2, function(xx) cor(xx, y))
+apply(x %*% beta.hat.sphd$beta,    2, function(xx) cor(xx, y))
 
 
 round(beta.hat.phd$beta.hat, 4)[1:7,1:5]
 round(dr.phd$evectors, 4)[1:7,1:5]
+round(beta.hat.sphd$beta, 4)[1:7,]
 
 
 dr.phd$M[1:5, 1:5]
@@ -196,12 +201,20 @@ summary(lm2a <- lm(y ~ x %*% beta.hat$beta.hat[,1:5] + I((x %*% beta.hat$beta.ha
                   + I((x %*% beta.hat$beta.hat[,1:3])^3)
                   + I((x %*% beta.hat$beta.hat[,1:3])^4)) )
 
-summary(lm1ap <- lm(y ~ x %*% beta.hat.phd$beta.hat[,1:5] + I((x %*% beta.hat.phd$beta.hat[,1:5])^2 )
-                   + I((x %*% beta.hat.phd$beta.hat[,1:5])^3 )) )
+summary(lm1ap <- lm(y ~ x %*% beta.hat.phd$beta.hat[,1:3] + I((x %*% beta.hat.phd$beta.hat[,1:3])^2 )
+                   + I((x %*% beta.hat.phd$beta.hat[,1:3])^3 )) )
 
-summary(lm2ap <- lm(y ~ x %*% beta.hat.phd$beta.hat[,1:5] + I((x %*% beta.hat.phd$beta.hat[,1:5])^2 )
+summary(lm2ap <- lm(y ~ x %*% beta.hat.phd$beta.hat[,1:3] + I((x %*% beta.hat.phd$beta.hat[,1:3])^2 )
                    + I((x %*% beta.hat.phd$beta.hat[,1:3])^3)
                    + I((x %*% beta.hat.phd$beta.hat[,1:3])^4)) )
+
+
+summary(lm1asp <- lm(y ~ x %*% beta.hat.sphd$beta[,1:3] + I((x %*% beta.hat.sphd$beta[,1:3])^2 )
+                    + I((x %*% beta.hat.sphd$beta[,1:3])^3 )) )
+
+summary(lm2asp <- lm(y ~ x %*% beta.hat.sphd$beta[,1:3] + I((x %*% beta.hat.sphd$beta[,1:3])^2 )
+                    + I((x %*% beta.hat.sphd$beta[,1:3])^3)
+                    + I((x %*% beta.hat.sphd$beta[,1:3])^4)) )
 
 anova(lm1a, lm2a)
 
