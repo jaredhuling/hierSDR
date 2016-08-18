@@ -3,9 +3,6 @@ Kepanechnikov  <- function(u) 0.75 * (1 - (u) ^ 2) * (abs(u) < 1)
 Kepanechnikov2 <- function(u) 0.75 * (1 - (u) ^ 2)
 
 
-Kepanechnikov  <- function(u) 0.75 * (1 - (u) ^ 2) * (abs(u) < 1)
-Kepanechnikov2 <- function(u) 0.75 * (1 - (u) ^ 2)
-
 semiDR <- function(x, y, d = 5L, maxit = 10L)
 {
 
@@ -94,7 +91,7 @@ semi.phd2 <- function(x, y, d = 5L, maxit = 10L, h = NULL)
     beta.init <- beta
     if (is.null(h))
     {
-        h <- exp(seq(log(0.1), log(25), length.out = 100))
+        h <- exp(seq(log(0.1), log(25), length.out = 25))
     }
 
     est.eqn <- function(beta.vec)
@@ -125,11 +122,12 @@ semi.phd2 <- function(x, y, d = 5L, maxit = 10L, h = NULL)
 
         resid <- y - fitted(locfit.mod)
 
+        P <- beta %*% solve(crossprod(beta), t(beta))
         V.hat <- crossprod(x.tilde, resid * x.tilde) / nrow(x)
         eig.V <- eigen(V.hat)
         beta  <- eig.V$vectors[,1:d]
 
-        objective[i] <- norm(V.hat, type = "F") ^ 2
+        objective[i] <- norm(V.hat - P %*% V.hat %*% P, type = "F") ^ 2
     }
 
     beta.hat  <- t(t(beta) %*% sqrt.inv.cov)
@@ -150,18 +148,35 @@ semi.phd <- function(x, y, d = 5L, maxit = 10L, h = NULL)
 
     V.hat <- crossprod(x.tilde, drop(scale(y, scale = FALSE)) * x.tilde) / nrow(x)
     eig.V <- eigen(V.hat)
-    beta  <- eig.V$vectors[,1:d]
+    beta.init  <- eig.V$vectors[,1:d]
 
     nobs         <- nrow(x)
     if (is.null(h))
     {
-        h <- exp(seq(log(0.1), log(25), length.out = 100))
+        h <- exp(seq(log(0.1), log(25), length.out = 25))
     }
 
     est.eqn <- function(beta.vec)
     {
-        beta.mat   <- rbind(diag(d), matrix(beta.vec, ncol = d))
-        directions <- x.tilde %*% beta
+        #beta.mat   <- rbind(beta.init[1:d,], matrix(beta.vec, ncol = d))
+        beta.mat   <- matrix(beta.vec, ncol = d)
+        directions <- x.tilde %*% beta.mat
+        gcv.vals   <- sapply(h, function(hv) gcv(x = directions, y = y, alpha = hv)[4])
+        best.h     <- h[which.min(gcv.vals)]
+        locfit.mod <- locfit.raw(x = directions, y = y, alpha = best.h)
+
+
+        Ey.given.xbeta <- fitted(locfit.mod)
+
+        resid <- drop(y - Ey.given.xbeta)
+        lhs   <- norm(crossprod(x.tilde, resid * x.tilde), type = "F") ^ 2
+        lhs
+    }
+
+    est.eqn2 <- function(beta.mat)
+    {
+        beta.mat2  <- rbind(beta.init[1:d,], beta.mat)
+        directions <- x.tilde %*% beta.mat2
         gcv.vals   <- sapply(h, function(hv) gcv(x = directions, y = y, alpha = hv)[4])
         best.h     <- h[which.min(gcv.vals)]
         locfit.mod <- locfit.raw(x = directions, y = y, alpha = best.h)
@@ -176,28 +191,46 @@ semi.phd <- function(x, y, d = 5L, maxit = 10L, h = NULL)
 
     #  beta[(d+1):nrow(beta),]
 
-    init <- rep(1, length(as.vector(beta[(d+1):nrow(beta),])) )
+    init <- rep(1, length(as.vector(beta.init[(d+1):nrow(beta.init),])) )
 
 
     #slver <- BBoptim(par = init,
     #               fn = est.eqn,
-    #               method = "SANN",
+    #               #method = "SANN",
     #               control = list(maxit = maxit,
     #                              maxfeval = maxit * 25))
 
-    slver <-   optim(par     = beta[(d+1):nrow(beta),],
-                     fn      = est.eqn,
-                     method  = "SANN",
-                     control = list(maxit = maxit))
+     slver <-   optim(par     = beta.init, # beta.init[(d+1):nrow(beta.init),],
+                      fn      = est.eqn,
+                      method  = "CG",
+                      control = list(maxit = maxit))
 
-    beta.semi <- rbind(diag(d), matrix(slver$par, ncol = d))
+    #slver <-   sbplx(x0      = as.vector(beta.init), # beta.init[(d+1):nrow(beta.init),],
+    #                     fn      = est.eqn,
+    #                  #lower = rep(-100, length(beta.init)),
+    #                  #upper = rep( 100, length(beta.init)),
+    #                     control = list(maxeval = maxit * 2))
 
-    beta.semi <- t(t(beta.semi) %*% sqrt.inv.cov)
+    #slver <- DEoptim(fn = est.eqn,
+    #                 lower = rep(-1e5, length(init)),
+    #                 upper = rep(1e5, length(init)))
 
+    #beta.semi <- rbind(diag(d), matrix(slver$par, ncol = d))
+
+
+    #beta <- beta.init[(d+1):nrow(beta.init),]
+    beta <- beta.init
     for (i in 1:maxit)
     {
 
     }
+
+    beta.semi <- rbind(beta.init[1:d, ], matrix(slver$par, ncol = d))
+    beta.semi <- matrix(slver$par, ncol = d)
+
+
+    beta.semi <- t(t(beta.semi) %*% sqrt.inv.cov)
+    beta      <- t(t(beta.init) %*% sqrt.inv.cov)
 
     #for (i in 1:maxit)
     #{
