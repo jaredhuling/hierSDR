@@ -139,14 +139,14 @@ semi.phd2 <- function(x, y, d = 5L, maxit = 10L, h = NULL)
 
 
 
-semi.phd <- function(x, y, d = 5L, maxit = 10L, h = NULL)
+semi.phd <- function(x, y, d = 5L, maxit = 10L, h = NULL, ...)
 {
     cov <- cov(x)
     eig.cov <- eigen(cov)
     sqrt.inv.cov <- eig.cov$vectors %*% diag(1 / sqrt(eig.cov$values)) %*% t(eig.cov$vectors)
     x.tilde <- scale(x, scale = FALSE) %*% sqrt.inv.cov
 
-    V.hat <- crossprod(x.tilde, drop(scale(y, scale = FALSE)) * x.tilde) / nrow(x)
+    V.hat <- crossprod(x.tilde, drop(scale(y, scale = FALSE)) * x.tilde) / nrow(x.tilde)
     eig.V <- eigen(V.hat)
     beta.init  <- eig.V$vectors[,1:d]
 
@@ -161,9 +161,9 @@ semi.phd <- function(x, y, d = 5L, maxit = 10L, h = NULL)
         #beta.mat   <- rbind(beta.init[1:d,], matrix(beta.vec, ncol = d))
         beta.mat   <- matrix(beta.vec, ncol = d)
         directions <- x.tilde %*% beta.mat
-        gcv.vals   <- sapply(h, function(hv) gcv(x = directions, y = y, alpha = hv)[4])
+        gcv.vals   <- sapply(h, function(hv) gcv(x = directions, y = y, alpha = hv, ...)[4])
         best.h     <- h[which.min(gcv.vals)]
-        locfit.mod <- locfit.raw(x = directions, y = y, alpha = best.h)
+        locfit.mod <- locfit.raw(x = directions, y = y, alpha = best.h, ...)
 
 
         Ey.given.xbeta <- fitted(locfit.mod)
