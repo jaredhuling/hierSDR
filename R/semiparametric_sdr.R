@@ -143,6 +143,8 @@ semi.phd <- function(x, y, d = 5L, maxit = 10L, h = NULL, ...)
 {
     cov <- cov(x)
     eig.cov <- eigen(cov)
+    nobs  <- nrow(x)
+    nvars <- ncol(x)
     sqrt.inv.cov <- eig.cov$vectors %*% diag(1 / sqrt(eig.cov$values)) %*% t(eig.cov$vectors)
     x.tilde <- scale(x, scale = FALSE) %*% sqrt.inv.cov
 
@@ -150,7 +152,6 @@ semi.phd <- function(x, y, d = 5L, maxit = 10L, h = NULL, ...)
     eig.V <- eigen(V.hat)
     beta.init  <- eig.V$vectors[,1:d]
 
-    nobs         <- nrow(x)
     if (is.null(h))
     {
         h <- exp(seq(log(0.1), log(25), length.out = 25))
@@ -169,8 +170,31 @@ semi.phd <- function(x, y, d = 5L, maxit = 10L, h = NULL, ...)
         Ey.given.xbeta <- fitted(locfit.mod)
 
         resid <- drop(y - Ey.given.xbeta)
-        lhs   <- norm(crossprod(x.tilde, resid * x.tilde), type = "F") ^ 2
+        lhs   <- norm(crossprod(x.tilde, resid * x.tilde), type = "F") ^ 2 / (nobs ^ 2)
         lhs
+    }
+
+    est.eqn.grad <- function(beta.vec)
+    {
+        #beta.mat   <- rbind(beta.init[1:d,], matrix(beta.vec, ncol = d))
+        beta.mat   <- matrix(beta.vec, ncol = d)
+        directions <- x.tilde %*% beta.mat
+        gcv.vals   <- sapply(h, function(hv) gcv(x = directions, y = y, alpha = hv, ...)[4])
+        best.h     <- h[which.min(gcv.vals)]
+        locfit.mod <- locfit.raw(x = directions, y = y, alpha = best.h, ...)
+        locfit.mod.deriv <- locfit.raw(x = directions, y = y, alpha = best.h, deriv = 1, ...)
+
+
+        Ey.given.xbeta       <- fitted(locfit.mod)
+        Ey.given.xbeta.deriv <- fitted(locfit.mod.deriv)
+
+        resid    <- drop(y - Ey.given.xbeta)
+        psi      <- crossprod(x.tilde, resid * x.tilde) / nobs
+        ## psi gradient with respect to just one column of beta
+        psi.grad <- crossprod(x.tilde, (Ey.given.xbeta * Ey.given.xbeta.deriv * rowSums(x.tilde ^ 2) ) ) / nobs
+        gradient <- 2 * t(psi %*% psi.grad)
+        ## psi gradient is essentially just grad of one column repeated d times
+        rep(drop(gradient), d)
     }
 
     est.eqn2 <- function(beta.mat)
@@ -199,6 +223,24 @@ semi.phd <- function(x, y, d = 5L, maxit = 10L, h = NULL, ...)
     #               #method = "SANN",
     #               control = list(maxit = maxit,
     #                              maxfeval = maxit * 25))
+
+
+    #beta <- as.vector(beta.init)
+    #for (i in 1:maxit)
+    #{
+    #    prev <- beta
+    #    gradient <- grad(est.eqn, x = prev, method = "simple")
+    #    jacobi   <- jacobian(est.eqn, x = prev, method = "simple")
+    #    beta     <- beta - (gradient / jacobi)
+    #
+    #    print(i)
+    #    if (max(abs(beta - prev) < 1e-5))
+    #    {
+    #        break
+    #    }
+    #}
+
+    #slver <- list(par = beta, value = est.eqn(beta))
 
      slver <-   optim(par     = beta.init, # beta.init[(d+1):nrow(beta.init),],
                       fn      = est.eqn,
