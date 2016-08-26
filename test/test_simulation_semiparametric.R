@@ -104,7 +104,13 @@ hier.semi.phd <- function(x.list, y, d = 2L, maxit = 10L, h = NULL, ...)
 
     #for (c in 1:length(constraints)) constraints[[c]] <- sqrt.inv.cov %*% constraints[[c]]
 
-    s.phd <- semi.phd(x = x, y = y, d = d * 3, maxit = maxit, h = h, ...)
+    strat.id <- unlist(lapply(1:length(x.list), function(id) rep(id, nrow(x.list[[id]]))))
+
+    s.phd <- semi.phd.for.hier(x = x, y = y, d = d * 3,
+                               maxit = maxit, h = h,
+                               strat.id = strat.id,
+                               constraints = constraints,
+                               ...)
     beta.semi.phd <- s.phd$beta
 
     beta.list <- vector(mode = "list", length = length(constraints))
@@ -121,7 +127,7 @@ hier.semi.phd <- function(x.list, y, d = 2L, maxit = 10L, h = NULL, ...)
 
 
 # simulation parameters
-nsims     <- 10
+nsims     <- 50
 nobs.vec  <- c(250, 500, 1000, 2000)
 nobs.test <- 1e4
 nvars     <- 50
@@ -135,8 +141,8 @@ colnames(sim.res) <- c("hier sir", "hier phd",
                        "hier sir (big)", "hier phd (big)",
                        "sir (big)", "phd (big)", "sir separate", "phd separate")
 
-sim.res.dir <- array(NA, dim = c(nsims, 5))
-colnames(sim.res.dir) <- c("hier sir", "hier phd", "semi hier phd", "sir separate", "phd separate")
+sim.res.dir <- array(NA, dim = c(nsims, 6))
+colnames(sim.res.dir) <- c("hier sir", "hier phd", "semi hier phd", "sir separate", "phd separate", "semi phd separate")
 
 sim.res.list <- rep(list(sim.res), length(nobs.vec))
 sim.direction.res.list <- rep(list(sim.res.dir), length(nobs.vec))
@@ -150,6 +156,8 @@ for (n in 1:length(nobs.vec))
 
         x.list      <- replicate(3, list(matrix(rnorm(nobs * nvars), ncol = nvars)))
         x.list.test <- replicate(3, list(matrix(rnorm(nobs.test * nvars), ncol = nvars)))
+        #x.list      <- replicate(3, list(matrix(c(rnorm(nobs * nvars/2), rbinom(nobs * nvars/2, 1, 0.5)), ncol = nvars)))
+        #x.list.test <- replicate(3, list(matrix(c(rnorm(nobs.test * nvars/2), rbinom(nobs.test * nvars/2, 1, 0.5)), ncol = nvars)))
         x <- bdiag(x.list)
         x.test <- as.matrix(bdiag(x.list.test))
 
@@ -198,17 +206,134 @@ for (n in 1:length(nobs.vec))
         sdr.sir       <- sir(as.matrix(x), y, d = 1 * 3, h = 30L)
         sdr.phd       <- phd(as.matrix(x), y, d = 1 * 3)
 
-        semi.hier.phd <- hier.semi.phd(x.list,  drop(y), d = 1, h = seq(1, 5, length.out = 7), maxit = 200,
-                                       maxk = 250)
+        semi.hier.phd <- hier.semi.phd(x.list,  drop(y), d = 1, h = exp(seq(log(0.5), log(25), length.out = 25)), maxit = 250, maxk = 1200)
 
-        sir.1 <- sir(x.list[[1]], y[1:nobs], d = 1, h = 30L)
-        sir.2 <- sir(x.list[[2]], y[(1 + nobs):(2*nobs)], d = 1, h = 30L)
+        sir.1 <- sir(x.list[[1]], y[1:nobs],                d = 1, h = 30L)
+        sir.2 <- sir(x.list[[2]], y[(1 + nobs):(2*nobs)],   d = 1, h = 30L)
         sir.3 <- sir(x.list[[3]], y[(1 + 2*nobs):(3*nobs)], d = 3, h = 30L)
 
-        phd.1 <- phd(x.list[[1]], y[1:nobs], d = 1)
-        phd.2 <- phd(x.list[[2]], y[(1 + nobs):(2*nobs)], d = 1)
+        phd.1 <- phd(x.list[[1]], y[1:nobs],                d = 1)
+        phd.2 <- phd(x.list[[2]], y[(1 + nobs):(2*nobs)],   d = 1)
         phd.3 <- phd(x.list[[3]], y[(1 + 2*nobs):(3*nobs)], d = 3)
 
+        s.phd.1 <- semi.phd(x.list[[1]], y[1:nobs],                d = 1, h = exp(seq(log(0.25), log(25), length.out = 25)), maxit = 250, maxk = 450)
+        s.phd.2 <- semi.phd(x.list[[2]], y[(1 + nobs):(2*nobs)],   d = 1, h = exp(seq(log(0.25), log(25), length.out = 25)), maxit = 250, maxk = 450)
+        s.phd.3 <- semi.phd(x.list[[3]], y[(1 + 2*nobs):(3*nobs)], d = 3, h = exp(seq(log(0.25), log(25), length.out = 25)), maxit = 250, maxk = 450)
+
+        est.eqn.tmp <- function(beta.vec)
+        {
+            h = seq(1, 50, length.out = 25)
+            x.tt       <- x.list[[1]]
+            cov <- cov(x.tt)
+            eig.cov <- eigen(cov)
+            sqrt.inv.cov <- eig.cov$vectors %*% diag(1 / sqrt(eig.cov$values)) %*% t(eig.cov$vectors)
+            x.tildet <- scale(x.tt, scale = FALSE) %*% sqrt.inv.cov
+
+            #beta.mat   <- rbind(beta.init[1:1,], matrix(beta.vec, ncol = 1))
+            beta.mat   <- matrix(beta.vec, ncol = 1)
+            directions <- x.tildet %*% beta.mat
+            gcv.vals   <- sapply(h, function(hv) gcv(x = directions, y = y[1:nobs],
+                                                     alpha = hv, maxk = 250, deg = 3)[4])
+            best.h     <- h[which.min(gcv.vals)]
+            locfit.mod <- locfit.raw(x = directions, y = y[1:nobs], alpha = best.h, maxk = 250, deg = 3)
+
+
+            Ey.given.xbeta <- fitted(locfit.mod)
+
+            resid <- drop(y[1:nobs] - Ey.given.xbeta)
+            lhs   <- norm(crossprod(x.tildet, resid * x.tildet), type = "F") ^ 2 / (nobs ^ 2)
+            lhs
+        }
+
+        est.eqn.grad.tmp <- function(beta.vec)
+        {
+            h = seq(1, 50, length.out = 25)
+            x.tt       <- x.list[[1]]
+            cov <- cov(x.tt)
+            eig.cov <- eigen(cov)
+            sqrt.inv.cov <- eig.cov$vectors %*% diag(1 / sqrt(eig.cov$values)) %*% t(eig.cov$vectors)
+            x.tildet <- scale(x.tt, scale = FALSE) %*% sqrt.inv.cov
+
+            #beta.mat   <- rbind(beta.init[1:1,], matrix(beta.vec, ncol = 1))
+            beta.mat   <- matrix(beta.vec, ncol = 1)
+            directions <- x.tildet %*% beta.mat
+            gcv.vals   <- sapply(h, function(hv) gcv(x = directions, y = y[1:nobs], alpha = hv, maxk = 250)[4])
+            best.h     <- h[which.min(gcv.vals)]
+            locfit.mod       <- locfit.raw(x = directions, y = y[1:nobs],
+                                           alpha = best.h,            maxk = 250,
+                                           deg   = 3)
+            locfit.mod.deriv <- locfit.raw(x = directions, y = y[1:nobs],
+                                           alpha = best.h, deriv = 1, maxk = 250,
+                                           deg   = 3)
+
+
+            Ey.given.xbeta       <- fitted(locfit.mod)
+            Ey.given.xbeta.deriv <- fitted(locfit.mod.deriv)
+
+            resid <- drop(y[1:nobs] - Ey.given.xbeta)
+            psi      <- crossprod(x.tildet, resid * x.tildet) / nobs
+            psi.grad <- -crossprod(x.tildet, (Ey.given.xbeta.deriv * rowSums(x.tildet ^ 2) ) ) / nobs
+            gradient <- 2 * t(psi) %*% psi.grad
+            rep(drop(gradient), 1)
+        }
+
+
+        est.eqn.tmp2 <- function(beta.vec, idx = 1L)
+        {
+            h = exp(seq(log(0.25), log(15), length.out = 25))
+            x.tt       <- x.list[[1]]
+            cov <- cov(x.tt)
+            eig.cov <- eigen(cov)
+            sqrt.inv.cov <- eig.cov$vectors %*% diag(1 / sqrt(eig.cov$values)) %*% t(eig.cov$vectors)
+            x.tildet <- scale(x.tt, scale = FALSE) %*% sqrt.inv.cov
+
+            #beta.mat   <- rbind(beta.init[1:1,], matrix(beta.vec, ncol = 1))
+            beta.mat   <- matrix(beta.vec, ncol = 1)
+            directions <- x.tildet %*% beta.mat
+            gcv.vals   <- sapply(h, function(hv) gcv(x = directions, y = y[1:nobs], alpha = hv, deg = 3, maxk = 250)[4])
+            best.h     <- h[which.min(gcv.vals)]
+            locfit.mod <- locfit.raw(x = directions, y = y[1:nobs], alpha = best.h, deg = 3, maxk = 250)
+
+
+            Ey.given.xbeta <- fitted(locfit.mod)
+
+            resid <- drop(y[1:nobs] - Ey.given.xbeta)
+            #lhs   <- (crossprod(x.tildet, resid * x.tildet) / nobs)[1,1]
+            lhs <- sum(resid) / nobs
+            #lhs
+            resid[idx]
+        }
+
+        est.eqn.grad.tmp2 <- function(beta.vec, idx = 1L)
+        {
+            h = exp(seq(log(0.25), log(15), length.out = 25))
+            x.tt       <- x.list[[1]]
+            cov <- cov(x.tt)
+            eig.cov <- eigen(cov)
+            sqrt.inv.cov <- eig.cov$vectors %*% diag(1 / sqrt(eig.cov$values)) %*% t(eig.cov$vectors)
+            x.tildet <- scale(x.tt, scale = FALSE) %*% sqrt.inv.cov
+
+            #beta.mat   <- rbind(beta.init[1:1,], matrix(beta.vec, ncol = 1))
+            beta.mat   <- matrix(beta.vec, ncol = 1)
+            directions <- x.tildet %*% beta.mat
+            gcv.vals   <- sapply(h, function(hv) gcv(x = directions, y = y[1:nobs], alpha = hv, deg = 3, maxk = 250)[4])
+            best.h     <- h[which.min(gcv.vals)]
+            locfit.mod <- locfit.raw(x = directions, y = y[1:nobs], alpha = best.h, deg = 3, maxk = 250)
+            locfit.mod.deriv <- locfit.raw(x = directions, y = y[1:nobs], alpha = best.h, deriv = 1, deg = 3, maxk = 250)
+
+
+            Ey.given.xbeta       <- fitted(locfit.mod)
+            Ey.given.xbeta.deriv <- fitted(locfit.mod.deriv)
+
+            resid <- drop(y[1:nobs] - Ey.given.xbeta)
+            #psi      <- (crossprod(x.tildet, resid * x.tildet) / nobs)
+            #psi.grad <- -crossprod(x.tildet, (Ey.given.xbeta.deriv * rowSums(x.tildet ^ 2) ) ) / nobs
+            #gradient <- 2 * t(psi) %*% psi.grad
+            gradient <- -colSums(Ey.given.xbeta.deriv * x.tildet) / nobs
+            #gradient <- -Ey.given.xbeta.deriv[10] * x.tildet[10,]
+            #gradient <- -Ey.given.xbeta.deriv[idx] * x.tildet[idx,]
+            rep(drop(gradient), 1)
+        }
 
 
         cor.directions <- function(a, b, x)
@@ -218,6 +343,58 @@ for (n in 1:length(nobs.vec))
             R.sq
         }
 
+        tmp.fun.grad <- function(x.vec)
+        {
+            set.seed(123)
+            x.tmp <- matrix(rnorm(100), ncol = 1)
+            y.tmp <- drop(sin(x.tmp * pi) * x.tmp ^ 2) + rnorm(100, sd = 0.1)
+
+            h = seq(0.5, 15, length.out = 25)
+            gcv.vals   <- sapply(h, function(hv) gcv(x = x.tmp, y = y.tmp, alpha = hv, deg = 3, maxk = 250)[4])
+            best.h     <- h[which.min(gcv.vals)]
+            locfit.mod <- locfit.raw(x = x.tmp, y = y.tmp,       alpha = best.h, deg = 3, maxk = 250)
+            locfit.mod.deriv <- locfit.raw(x = x.tmp, y = y.tmp, alpha = best.h, deriv = 1, deg = 3, maxk = 250)
+            #Ey.given.xbeta.deriv <- fitted(locfit.mod.deriv)
+
+            predict(locfit.mod.deriv, matrix(x.vec, ncol = 1))
+        }
+
+        tmp.fun <- function(x.vec)
+        {
+            set.seed(123)
+            x.tmp <- matrix(rnorm(100), ncol = 1)
+            y.tmp <- drop(sin(x.tmp * pi) * x.tmp ^ 2) + rnorm(100, sd = 0.1)
+
+            h = seq(0.5, 15, length.out = 25)
+            gcv.vals   <- sapply(h, function(hv) gcv(x = x.tmp, y = y.tmp, alpha = hv, deg = 3, maxk = 250)[4])
+            best.h     <- h[which.min(gcv.vals)]
+            locfit.mod <- locfit.raw(x = x.tmp, y = y.tmp,       alpha = best.h, deg = 3, maxk = 250)
+            #locfit.mod.deriv <- locfit.raw(x = x.tmp, y = y.tmp, alpha = best.h, deriv = 1, maxk = 250)
+            #Ey.given.xbeta.deriv <- fitted(locfit.mod.deriv)
+
+            predict(locfit.mod, matrix(x.vec, ncol = 1))
+        }
+
+
+        #round(gr.a <- est.eqn.grad.tmp( s.phd.1$solver.obj$par), 2)
+        #round(gr.n <- grad(est.eqn.tmp, s.phd.1$solver.obj$par), 2)
+        #cor(gr.a, gr.n)
+
+        ## psi grad
+        #grad.analytical  <- est.eqn.grad.tmp2( s.phd.1$solver.obj$par)
+        #grad.numerical   <- grad(est.eqn.tmp2, s.phd.1$solver.obj$par)
+
+        #cor(grad.numerical, grad.analytical)
+
+
+        #angles(Re(hier.sdr$beta.hat[1:nvars,1]), beta.a)
+        #angles(Re(hier.sdr.phd$beta.hat[1:nvars,1]), beta.a)
+        #angles(Re(semi.hier.phd$beta.hat[1:nvars,1]), beta.a)
+        #angles(Re(semi.hier.phd$beta.unconstrained[1:nvars,1]), beta.a)
+
+        #angles(phd.1$beta.hat[1:nvars,1], beta.a)
+        #angles(sir.1$beta.hat[1:nvars,1], beta.a)
+        #angles(s.phd.1$beta[1:nvars,1], beta.a)
 
         ## beta A
         hier.sir.cor <- cor.directions(Re(hier.sdr$beta.hat[1:nvars,1]), beta.a, x.list.test[[1]])
@@ -226,6 +403,7 @@ for (n in 1:length(nobs.vec))
         semi.hier.phd.cor.u <- cor.directions(Re(semi.hier.phd$beta.unconstrained[1:nvars,1]), beta.a, x.list.test[[1]])
         phd.cor      <- cor.directions(phd.1$beta.hat[1:nvars,1], beta.a, x.list.test[[1]])
         sir.cor      <- cor.directions(sir.1$beta.hat[1:nvars,1], beta.a, x.list.test[[1]])
+        s.phd.cor    <- cor.directions(s.phd.1$beta[1:nvars,1],   beta.a, x.list.test[[1]])
 
 
         ## beta B
@@ -233,8 +411,9 @@ for (n in 1:length(nobs.vec))
         hier.phd.cor <- hier.phd.cor + cor.directions(Re(hier.sdr.phd$beta.hat[(nvars+1):(2 * nvars),2]), beta.b, x.list.test[[2]])
         semi.hier.phd.cor <- semi.hier.phd.cor + cor.directions(Re(semi.hier.phd$beta.hat[(nvars+1):(2 * nvars),2]), beta.a, x.list.test[[2]])
         semi.hier.phd.cor.u <- semi.hier.phd.cor + cor.directions(Re(semi.hier.phd$beta.unconstrained[(nvars+1):(2 * nvars),2]), beta.a, x.list.test[[2]])
-        phd.cor      <- phd.cor      + cor.directions(phd.2$beta.hat[1:nvars,1],    beta.b, x.list.test[[2]])
+        phd.cor      <- phd.cor      + cor.directions(phd.2$beta.hat[1:nvars,1], beta.b, x.list.test[[2]])
         sir.cor      <- sir.cor      + cor.directions(sir.2$beta.hat[1:nvars,1], beta.b, x.list.test[[2]])
+        s.phd.cor    <- s.phd.cor    + cor.directions(s.phd.2$beta[1:nvars,1],   beta.b, x.list.test[[2]])
 
         ## beta AB -> A
         hier.sir.cor <- hier.sir.cor + max(sapply(1:3, function(idx) cor.directions(Re(hier.sdr$beta.hat[(2*nvars+1):(3 * nvars),1]),     beta.ab[,idx], x.list.test[[3]])))
@@ -243,6 +422,7 @@ for (n in 1:length(nobs.vec))
         semi.hier.phd.cor.u <- semi.hier.phd.cor + max(sapply(1:3, function(idx) cor.directions(Re(semi.hier.phd$beta.unconstrained[(2*nvars+1):(3 * nvars),1]), beta.ab[,idx], x.list.test[[3]])))
         phd.cor      <- phd.cor      + max(sapply(1:3, function(idx) cor.directions(phd.3$beta.hat[1:nvars,1], beta.ab[,idx], x.list.test[[3]])))
         sir.cor      <- sir.cor      + max(sapply(1:3, function(idx) cor.directions(sir.3$beta.hat[1:nvars,1], beta.ab[,idx], x.list.test[[3]])))
+        s.phd.cor    <- s.phd.cor    + max(sapply(1:3, function(idx) cor.directions(s.phd.3$beta[1:nvars,1], beta.ab[,idx], x.list.test[[3]])))
 
         ## beta AB -> B
         hier.sir.cor <- hier.sir.cor + max(sapply(1:3, function(idx) cor.directions(Re(hier.sdr$beta.hat[(2*nvars+1):(3 * nvars),2]),     beta.ab[,idx], x.list.test[[3]])))
@@ -251,6 +431,7 @@ for (n in 1:length(nobs.vec))
         semi.hier.phd.cor.u <- semi.hier.phd.cor + max(sapply(1:3, function(idx) cor.directions(Re(semi.hier.phd$beta.unconstrained[(2*nvars+1):(3 * nvars),2]), beta.ab[,idx], x.list.test[[3]])))
         phd.cor      <- phd.cor      + max(sapply(1:3, function(idx) cor.directions(phd.3$beta.hat[1:nvars,2], beta.ab[,idx], x.list.test[[3]])))
         sir.cor      <- sir.cor      + max(sapply(1:3, function(idx) cor.directions(sir.3$beta.hat[1:nvars,2], beta.ab[,idx], x.list.test[[3]])))
+        s.phd.cor    <- s.phd.cor    + max(sapply(1:3, function(idx) cor.directions(s.phd.3$beta[1:nvars,2], beta.ab[,idx], x.list.test[[3]])))
 
         ## beta AB -> eta AB
         hier.sir.cor <- hier.sir.cor + max(sapply(1:3, function(idx) cor.directions(Re(hier.sdr$beta.hat[(2*nvars+1):(3 * nvars),3]),     beta.ab[,idx], x.list.test[[3]])))
@@ -259,6 +440,7 @@ for (n in 1:length(nobs.vec))
         semi.hier.phd.cor.u <- semi.hier.phd.cor + max(sapply(1:3, function(idx) cor.directions(Re(semi.hier.phd$beta.unconstrained[(2*nvars+1):(3 * nvars),3]), beta.ab[,idx], x.list.test[[3]])))
         phd.cor      <- phd.cor      + max(sapply(1:3, function(idx) cor.directions(phd.3$beta.hat[1:nvars,3], beta.ab[,idx], x.list.test[[3]])))
         sir.cor      <- sir.cor      + max(sapply(1:3, function(idx) cor.directions(sir.3$beta.hat[1:nvars,3], beta.ab[,idx], x.list.test[[3]])))
+        s.phd.cor    <- s.phd.cor    + max(sapply(1:3, function(idx) cor.directions(s.phd.3$beta[1:nvars,3], beta.ab[,idx], x.list.test[[3]])))
 
         hier.sir.cor <- hier.sir.cor / 5
         hier.phd.cor <- hier.phd.cor / 5
@@ -266,6 +448,7 @@ for (n in 1:length(nobs.vec))
         semi.hier.phd.cor.u <- semi.hier.phd.cor.u / 5
         phd.cor      <- phd.cor / 5
         sir.cor      <- sir.cor / 5
+        s.phd.cor    <- s.phd.cor / 5
 
         sim.direction.res.list[[n]][s,1] <- hier.sir.cor
         sim.direction.res.list[[n]][s,2] <- hier.phd.cor
@@ -273,6 +456,7 @@ for (n in 1:length(nobs.vec))
 
         sim.direction.res.list[[n]][s,4] <- sir.cor
         sim.direction.res.list[[n]][s,5] <- phd.cor
+        sim.direction.res.list[[n]][s,6] <- s.phd.cor
 
 #         directions.sir      <- as.matrix(x %*% Re(hier.sdr$beta.hat))
 #         directions.sir.test <- as.matrix(x.test %*% Re(hier.sdr$beta.hat))
@@ -480,7 +664,7 @@ df.m.dir <- data.frame(res.dir, nobs = rep(nobs.vec, each = nsims * ncol(sim.dir
 colnames(df.m.dir)[2:3] <- c("Method", "R2")
 #df.m.dir2 <- df.m.dir2[which(df.m.dir2$R2 > -0.25),]
 
-df.m.dir$Method <- factor(df.m.dir$Method, levels = levels(df.m.dir$Method)[c(1,3,2,4)])
+df.m.dir$Method <- factor(df.m.dir$Method, levels = levels(df.m.dir$Method)[c(1,4,2,3,5,6)])
 
 pdf(paste0(fig.path, "sim_semi_1a_directions_nvars50_boxplots.pdf"), height = 8, width = 10)
 
