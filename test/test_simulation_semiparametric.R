@@ -128,7 +128,7 @@ hier.semi.phd <- function(x.list, y, d = 2L, maxit = 10L, h = NULL, ...)
 
 # simulation parameters
 nsims     <- 50
-nobs.vec  <- c(250, 500, 1000, 2000)
+nobs.vec  <- c(250, 500, 1000, 2000)[1:3]
 nobs.test <- 1e4
 nvars     <- 50
 sd.sim    <- 2
@@ -141,17 +141,18 @@ colnames(sim.res) <- c("hier sir", "hier phd",
                        "hier sir (big)", "hier phd (big)",
                        "sir (big)", "phd (big)", "sir separate", "phd separate")
 
-sim.res.dir <- array(NA, dim = c(nsims, 6))
-colnames(sim.res.dir) <- c("hier sir", "hier phd", "semi hier phd", "sir separate", "phd separate", "semi phd separate")
+sim.res.dir <- array(NA, dim = c(nsims, 7))
+colnames(sim.res.dir) <- c("hier sir", "hier phd", "semi hier phd", "sir separate", "phd separate", "semi phd separate", "semi hier phd 2")
 
 sim.res.list <- rep(list(sim.res), length(nobs.vec))
 sim.direction.res.list <- rep(list(sim.res.dir), length(nobs.vec))
+sim.subsp.angle.res.list <- sim.direction.res.list
 
-for (n in 1:length(nobs.vec))
+for (n in 3:length(nobs.vec))
 {
     nobs <- nobs.vec[n]
 
-    for (s in 1:nsims)
+    for (s in 6:nsims)
     {
 
         x.list      <- replicate(3, list(matrix(rnorm(nobs * nvars), ncol = nvars)))
@@ -206,7 +207,7 @@ for (n in 1:length(nobs.vec))
         sdr.sir       <- sir(as.matrix(x), y, d = 1 * 3, h = 30L)
         sdr.phd       <- phd(as.matrix(x), y, d = 1 * 3)
 
-        semi.hier.phd <- hier.semi.phd(x.list,  drop(y), d = 1, h = exp(seq(log(0.5), log(25), length.out = 25)), maxit = 250, maxk = 1200)
+        semi.hier.phd  <- hier.semi.phd(x.list, drop(y), d = 1, h = exp(seq(log(0.5), log(25), length.out = 25)), maxit = 250, maxk = 1200)
         semi.hier.phd2 <- semi.phd.hier(x.list, drop(y), d = 1, h = exp(seq(log(0.5), log(25), length.out = 25)), maxit = 250, maxk = 1200)
 
 
@@ -389,14 +390,36 @@ for (n in 1:length(nobs.vec))
         #cor(grad.numerical, grad.analytical)
 
 
-        #angles(Re(hier.sdr$beta.hat[1:nvars,1]), beta.a)
-        #angles(Re(hier.sdr.phd$beta.hat[1:nvars,1]), beta.a)
-        #angles(Re(semi.hier.phd$beta.hat[1:nvars,1]), beta.a)
-        #angles(Re(semi.hier.phd$beta.unconstrained[1:nvars,1]), beta.a)
+        # angles(Re(hier.sdr$beta.hat[1:nvars,1]), beta.a)
+        # angles(Re(hier.sdr.phd$beta.hat[1:nvars,1]), beta.a)
+        # angles(Re(semi.hier.phd$beta.hat[1:nvars,1]), beta.a)
+        # angles(Re(semi.hier.phd2$beta[1:nvars,1]), beta.a)
+        # angles(Re(semi.hier.phd$beta.unconstrained[1:nvars,1]), beta.a)
 
-        #angles(phd.1$beta.hat[1:nvars,1], beta.a)
-        #angles(sir.1$beta.hat[1:nvars,1], beta.a)
-        #angles(s.phd.1$beta[1:nvars,1], beta.a)
+        # angles(phd.1$beta.hat[1:nvars,1], beta.a)
+        # angles(sir.1$beta.hat[1:nvars,1], beta.a)
+        # angles(s.phd.1$beta[1:nvars,1], beta.a)
+
+         sim.subsp.angle.res.list[[n]][s,1] <- (1/5) * ((angles(Re(hier.sdr$beta.hat[1:nvars,1]), beta.a) + angles(Re(hier.sdr$beta.hat[(nvars+1):(2 * nvars),2]),beta.b) )
+          + 3 * angles(Re(hier.sdr$beta.hat[(2*nvars+1):(3 * nvars),]), beta.ab))
+
+         sim.subsp.angle.res.list[[n]][s,2] <- (1/5) * ((angles(Re(hier.sdr.phd$beta.hat[1:nvars,1]), beta.a) + angles(Re(hier.sdr.phd$beta.hat[(nvars+1):(2 * nvars),2]),beta.b) )
+                  + 3 * angles(Re(hier.sdr.phd$beta.hat[(2*nvars+1):(3 * nvars),]), beta.ab))
+
+         sim.subsp.angle.res.list[[n]][s,3] <- (1/5) * ((angles(Re(semi.hier.phd$beta.hat[1:nvars,1]), beta.a) + angles(Re(semi.hier.phd$beta.hat[(nvars+1):(2 * nvars),2]),beta.b) )
+                  + 3 * angles(Re(semi.hier.phd$beta.hat[(2*nvars+1):(3 * nvars),]), beta.ab))
+
+         sim.subsp.angle.res.list[[n]][s,7] <- (1/5) * ((angles(Re(semi.hier.phd2$beta[1:nvars,1]), beta.a) + angles(Re(semi.hier.phd2$beta[(nvars+1):(2 * nvars),2]),beta.b) )
+                  + 3 * angles(Re(semi.hier.phd2$beta[(2*nvars+1):(3 * nvars),]), beta.ab))
+
+         sim.subsp.angle.res.list[[n]][s,5] <- (1/5) * ((angles(phd.1$beta.hat[1:nvars,1], beta.a) + angles(phd.2$beta.hat[1:nvars,1],beta.b) )
+                  + 3 * angles(phd.3$beta.hat, beta.ab))
+
+         sim.subsp.angle.res.list[[n]][s,4] <- (1/5) * (( angles(sir.1$beta.hat[1:nvars,1], beta.a) + angles(sir.2$beta.hat[1:nvars,1],beta.b) )
+                  + 3 * angles(sir.3$beta.hat, beta.ab))
+
+         sim.subsp.angle.res.list[[n]][s,6] <- (1/5) * ((angles(s.phd.1$beta[1:nvars,1], beta.a)+ angles(s.phd.2$beta[1:nvars,1],beta.b) )
+                  + 3 * angles(s.phd.3$beta, beta.ab))
 
         ## beta A
         hier.sir.cor <- cor.directions(Re(hier.sdr$beta.hat[1:nvars,1]), beta.a, x.list.test[[1]])
@@ -474,6 +497,7 @@ for (n in 1:length(nobs.vec))
         sim.direction.res.list[[n]][s,4] <- sir.cor
         sim.direction.res.list[[n]][s,5] <- phd.cor
         sim.direction.res.list[[n]][s,6] <- s.phd.cor
+        sim.direction.res.list[[n]][s,7] <- semi.hier.phd.cor2
 
 #         directions.sir      <- as.matrix(x %*% Re(hier.sdr$beta.hat))
 #         directions.sir.test <- as.matrix(x.test %*% Re(hier.sdr$beta.hat))
@@ -650,6 +674,7 @@ for (n in 1:length(nobs.vec))
 
 res <- do.call(rbind, lapply(sim.res.list, melt))
 res.dir <- do.call(rbind, lapply(sim.direction.res.list, melt))
+res.angle <- do.call(rbind, lapply(sim.subsp.angle.res.list, melt))
 
 
 
@@ -677,11 +702,14 @@ ggplot(data = df.m, aes(x=Method, y=R2)) + geom_violin(aes(fill=Method)) +
 ## directions R^2
 
 df.m.dir <- data.frame(res.dir, nobs = rep(nobs.vec, each = nsims * ncol(sim.direction.res.list[[1]])))
+df.m.angle <- data.frame(res.angle, nobs = rep(nobs.vec, each = nsims * ncol(sim.subsp.angle.res.list[[1]])))
 
-colnames(df.m.dir)[2:3] <- c("Method", "R2")
+colnames(df.m.dir)[2:3] <- colnames(df.m.angle)[2:3] <- c("Method", "R2")
 #df.m.dir2 <- df.m.dir2[which(df.m.dir2$R2 > -0.25),]
 
-df.m.dir$Method <- factor(df.m.dir$Method, levels = levels(df.m.dir$Method)[c(1,4,2,3,5,6)])
+df.m.dir$Method <- factor(df.m.dir$Method, levels = levels(df.m.dir$Method)[c(1,4,2,5,6,3,7)])
+df.m.angle$Method <- factor(df.m.angle$Method, levels = levels(df.m.angle$Method)[c(1,4,2,5,6,3,7)])
+
 
 pdf(paste0(fig.path, "sim_semi_1a_directions_nvars50_boxplots.pdf"), height = 8, width = 10)
 
@@ -689,6 +717,367 @@ ggplot(data = df.m.dir, aes(x=Method, y=R2)) + geom_boxplot(aes(fill = Method)) 
     ylab("R^2") + facet_wrap(~ nobs) + theme_bw()
 
 dev.off()
+
+pdf(paste0(fig.path, "sim_semi_1a_angles_nvars50_boxplots.pdf"), height = 8, width = 10)
+
+ggplot(data = df.m.angle, aes(x=Method, y=R2)) + geom_boxplot(aes(fill = Method)) +
+    ylab("angle") + facet_wrap(~ nobs) + theme_bw()
+
+dev.off()
+
+
+
+
+
+
+############################
+#
+#   SIM 2
+#
+############################
+
+
+
+
+
+# simulation parameters
+nsims     <- 50
+nobs.vec  <- c(250, 500, 1000, 2000)[1:3]
+nobs.test <- 1e4
+nvars     <- 50
+sd.sim    <- 1
+
+set.seed(123)
+
+
+sim.res <- array(NA, dim = c(nsims, 8))
+colnames(sim.res) <- c("hier sir", "hier phd",
+                       "hier sir (big)", "hier phd (big)",
+                       "sir (big)", "phd (big)", "sir separate", "phd separate")
+
+sim.res.dir <- array(NA, dim = c(nsims, 7))
+colnames(sim.res.dir) <- c("hier sir", "hier phd", "semi hier phd", "sir separate", "phd separate", "semi phd separate", "semi hier phd 2")
+
+sim.res.list2 <- rep(list(sim.res), length(nobs.vec))
+sim.direction.res.list2 <- rep(list(sim.res.dir), length(nobs.vec))
+sim.subsp.angle.res.list2 <- sim.direction.res.list2
+
+library(MASS)
+rho <- 0.5
+cov.mat <- rho ^ abs(outer(1:(nvars - 10), 1:(nvars - 10), "-"))
+
+snr2 <- numeric(length(nobs.vec) * nsims)
+ct <- 0
+for (n in 1:length(nobs.vec))
+{
+    nobs <- nobs.vec[n]
+
+    for (s in 1:nsims)
+    {
+        ct <- ct + 1
+        x.list <- x.list.test <- vector(mode = "list", length = 3)
+        for (g in 1:3)
+        {
+            x.tmp  <- mvrnorm(n = nobs, mu = rep(0, nvars - 10), Sigma = cov.mat)
+            x.tmp2 <- apply(x.tmp[,1:5], 2, function(col) rbinom(length(col), 1, 1 / (1 + exp(-col))))
+            x.tmp3 <- apply(x.tmp[,6:10], 2, function(col) 0.1 * col ^ 2 + rnorm(length(col), sd = 0.5))
+            x.list[[g]] <- data.matrix(cbind(x.tmp, x.tmp2, x.tmp3))
+
+            x.tmp  <- mvrnorm(n = nobs.test, mu = rep(0, nvars - 10), Sigma = cov.mat)
+            x.tmp2 <- apply(x.tmp[,1:5], 2, function(col) rbinom(length(col), 1, 1 / (1 + exp(-col))))
+            x.tmp3 <- apply(x.tmp[,6:10], 2, function(col) 0.1 * col ^ 2 + rnorm(length(col), sd = 0.5))
+            x.list.test[[g]] <- data.matrix(cbind(x.tmp, x.tmp2, x.tmp3))
+        }
+
+
+        #x.list      <- replicate(3, list(matrix(rnorm(nobs * nvars), ncol = nvars)))
+        #x.list.test <- replicate(3, list(matrix(rnorm(nobs.test * nvars), ncol = nvars)))
+        #x.list      <- replicate(3, list(matrix(c(rnorm(nobs * nvars/2), rbinom(nobs * nvars/2, 1, 0.5)), ncol = nvars)))
+        #x.list.test <- replicate(3, list(matrix(c(rnorm(nobs.test * nvars/2), rbinom(nobs.test * nvars/2, 1, 0.5)), ncol = nvars)))
+        x <- bdiag(x.list)
+        x.test <- as.matrix(bdiag(x.list.test))
+
+        beta.a <- matrix(c(rnorm(nvars / 2, sd = 0.025),
+                           rnorm(nvars / 2, sd = 0.25)), ncol = 1)
+        beta.b <- matrix(c(rnorm(nvars / 2, sd = 0.025),
+                           rnorm(nvars / 2, sd = 0.25)), ncol = 1)
+        eta.ab <- matrix(c(rnorm(nvars / 2, sd = 0.025),
+                           rnorm(nvars / 2, sd = 0.25)), ncol = 1)
+
+
+        beta.ab <- cbind(beta.a, beta.b, eta.ab)
+
+        mult.a <- matrix(runif(nvars ^ 2, max = 1/sqrt(nvars)), ncol = nvars)
+        mult.b <- matrix(runif(nvars ^ 2, max = 1/sqrt(nvars)), ncol = nvars)
+
+        mult.a <- diag(runif(nvars, max = 2))
+        mult.b <- diag(runif(nvars, max = 2))
+
+        beta.ab <- cbind(mult.a %*% beta.a, mult.b %*% beta.b, eta.ab)
+
+
+#         y.true.a <- apply(exp(x.list[[1]] %*% beta.a) , 1, sum)
+#         y.true.b <- + 0.1 * ((x.list[[2]] %*% beta.b[,1]) ^ 2) ^ 2
+#         y.true.ab <- (apply( (x.list[[3]] %*% beta.a) ^ 2, 1, sum)) +
+#             0.1 * ((x.list[[3]] %*% beta.ab[,2]) ^ 2) ^ 2 +
+#             0.1 * (apply(exp(x.list[[3]] %*% beta.ab[,3]), 1, sum))
+#
+#         y.true <- c(y.true.a, y.true.b, y.true.ab)
+#         y <- y.true + rnorm(nobs, sd = sd.sim)
+
+
+        mult.mat <- matrix(runif(ncol(beta.ab) * 1, max = 0.5, min = -0.5), ncol = 1)
+        beta.ab.reduced <- beta.ab %*% mult.mat
+
+        y.true.a  <- apply((x.list[[1]] %*% beta.a) , 1, sum) / (0.5  + (apply((x.list[[1]] %*% beta.a) , 1, sum) + 1.5) ^ 2)
+        y.true.b  <- ((1 * x.list[[2]] %*% beta.b[,1]) ^ 2)
+        y.true.ab <- 0.5 * (apply(1 * exp(x.list[[3]] %*% beta.ab.reduced), 1, sum))
+
+        y.true <- c(y.true.a, y.true.b, y.true.ab)
+        y <- y.true + rnorm(nobs, sd = sd.sim)
+
+
+#         y.true.a <- apply( exp(x.list.test[[1]] %*% beta.a), 1, sum)
+#         y.true.b <- + 0.1 * ((x.list.test[[2]] %*% beta.b[,1]) ^ 2) ^ 2
+#         y.true.ab <- (apply( (x.list.test[[3]] %*% beta.a) ^ 2, 1, sum)) +
+#             0.1 * ((x.list.test[[3]] %*% beta.ab[,2]) ^ 2) ^ 2 +
+#             0.1 * (apply(exp(x.list.test[[3]] %*% beta.ab[,3]), 1, sum))
+#
+#         y.true.test <- c(y.true.a, y.true.b, y.true.ab)
+#         y.test <- y.true.test + rnorm(nobs.test, sd = sd.sim)
+
+
+        y.true.a  <- apply((x.list.test[[1]] %*% beta.a) , 1, sum) / (0.5  + (apply((x.list.test[[1]] %*% beta.a) , 1, sum) + 1.5) ^ 2)
+        y.true.b  <- ((1 * x.list.test[[2]] %*% beta.b[,1]) ^ 2)
+        y.true.ab <- 0.5 * (apply(exp(1 * x.list.test[[3]] %*% beta.ab.reduced), 1, sum))
+
+        y.true.test <- c(y.true.a, y.true.b, y.true.ab)
+        y.test <- y.true.test + rnorm(nobs.test, sd = sd.sim)
+
+        snr2[ct] <- var(y.true) / var(y - y.true)
+        print(snr2[ct])
+
+        hier.sdr      <- hier.sir(x.list, y,  d = 1, h = 30L)
+        hier.sdr.phd  <- hier.phd(x.list, y,  d = 1)
+        sdr.sir       <- sir(as.matrix(x), y, d = 1 * 3, h = 30L)
+        sdr.phd       <- phd(as.matrix(x), y, d = 1 * 3)
+
+        semi.hier.phd  <- hier.semi.phd(x.list, drop(y), d = 1, h = exp(seq(log(0.5), log(25), length.out = 25)), maxit = 250, maxk = 1200)
+        semi.hier.phd2 <- semi.phd.hier(x.list, drop(y), d = 1, h = exp(seq(log(0.5), log(25), length.out = 25)), maxit = 250, maxk = 1200)
+
+
+        sir.1 <- sir(x.list[[1]], y[1:nobs],                d = 1, h = 30L)
+        sir.2 <- sir(x.list[[2]], y[(1 + nobs):(2*nobs)],   d = 1, h = 30L)
+        sir.3 <- sir(x.list[[3]], y[(1 + 2*nobs):(3*nobs)], d = 3, h = 30L)
+
+        phd.1 <- phd(x.list[[1]], y[1:nobs],                d = 1)
+        phd.2 <- phd(x.list[[2]], y[(1 + nobs):(2*nobs)],   d = 1)
+        phd.3 <- phd(x.list[[3]], y[(1 + 2*nobs):(3*nobs)], d = 3)
+
+        s.phd.1 <- semi.phd(x.list[[1]], y[1:nobs],                d = 1, h = exp(seq(log(0.25), log(25), length.out = 25)), maxit = 250, maxk = 450)
+        s.phd.2 <- semi.phd(x.list[[2]], y[(1 + nobs):(2*nobs)],   d = 1, h = exp(seq(log(0.25), log(25), length.out = 25)), maxit = 250, maxk = 450)
+        s.phd.3 <- semi.phd(x.list[[3]], y[(1 + 2*nobs):(3*nobs)], d = 3, h = exp(seq(log(0.25), log(25), length.out = 25)), maxit = 250, maxk = 450)
+
+        cor.directions <- function(a, b, x)
+        {
+            cov <- cov(x)
+            R.sq <- as.vector(crossprod(a, cov %*% b) ^ 2 / (crossprod(a, cov %*% a) * crossprod(b, cov %*% b)) )
+            R.sq
+        }
+
+
+        sim.subsp.angle.res.list2[[n]][s,1] <- (1/5) * ((angles(Re(hier.sdr$beta.hat[1:nvars,1]), beta.a) + angles(Re(hier.sdr$beta.hat[(nvars+1):(2 * nvars),2]),beta.b) )
+                                                       + 3 * angles(Re(hier.sdr$beta.hat[(2*nvars+1):(3 * nvars),]), beta.ab))
+
+        sim.subsp.angle.res.list2[[n]][s,2] <- (1/5) * ((angles(Re(hier.sdr.phd$beta.hat[1:nvars,1]), beta.a) + angles(Re(hier.sdr.phd$beta.hat[(nvars+1):(2 * nvars),2]),beta.b) )
+                                                       + 3 * angles(Re(hier.sdr.phd$beta.hat[(2*nvars+1):(3 * nvars),]), beta.ab))
+
+        sim.subsp.angle.res.list2[[n]][s,3] <- (1/5) * ((angles(Re(semi.hier.phd$beta.hat[1:nvars,1]), beta.a) + angles(Re(semi.hier.phd$beta.hat[(nvars+1):(2 * nvars),2]),beta.b) )
+                                                       + 3 * angles(Re(semi.hier.phd$beta.hat[(2*nvars+1):(3 * nvars),]), beta.ab))
+
+        sim.subsp.angle.res.list2[[n]][s,7] <- (1/5) * ((angles(Re(semi.hier.phd2$beta[1:nvars,1]), beta.a) + angles(Re(semi.hier.phd2$beta[(nvars+1):(2 * nvars),2]),beta.b) )
+                                                       + 3 * angles(Re(semi.hier.phd2$beta[(2*nvars+1):(3 * nvars),]), beta.ab))
+
+        sim.subsp.angle.res.list2[[n]][s,5] <- (1/5) * ((angles(phd.1$beta.hat[1:nvars,1], beta.a) + angles(phd.2$beta.hat[1:nvars,1],beta.b) )
+                                                       + 3 * angles(phd.3$beta.hat, beta.ab))
+
+        sim.subsp.angle.res.list2[[n]][s,4] <- (1/5) * (( angles(sir.1$beta.hat[1:nvars,1], beta.a) + angles(sir.2$beta.hat[1:nvars,1],beta.b) )
+                                                       + 3 * angles(sir.3$beta.hat, beta.ab))
+
+        sim.subsp.angle.res.list2[[n]][s,6] <- (1/5) * ((angles(s.phd.1$beta[1:nvars,1], beta.a)+ angles(s.phd.2$beta[1:nvars,1],beta.b) )
+                                                       + 3 * angles(s.phd.3$beta, beta.ab))
+
+        ## beta A
+        hier.sir.cor <- cor.directions(Re(hier.sdr$beta.hat[1:nvars,1]), beta.a, x.list.test[[1]])
+        hier.phd.cor <- cor.directions(Re(hier.sdr.phd$beta.hat[1:nvars,1]), beta.a, x.list.test[[1]])
+        semi.hier.phd.cor <- cor.directions(Re(semi.hier.phd$beta.hat[1:nvars,1]), beta.a, x.list.test[[1]])
+        semi.hier.phd.cor2 <- cor.directions(Re(semi.hier.phd2$beta[1:nvars,1]), beta.a, x.list.test[[1]])
+        semi.hier.phd.cor.u <- cor.directions(Re(semi.hier.phd$beta.unconstrained[1:nvars,1]), beta.a, x.list.test[[1]])
+        phd.cor      <- cor.directions(phd.1$beta.hat[1:nvars,1], beta.a, x.list.test[[1]])
+        sir.cor      <- cor.directions(sir.1$beta.hat[1:nvars,1], beta.a, x.list.test[[1]])
+        s.phd.cor    <- cor.directions(s.phd.1$beta[1:nvars,1],   beta.a, x.list.test[[1]])
+
+
+        ## beta B
+        hier.sir.cor <- hier.sir.cor + cor.directions(Re(hier.sdr$beta.hat[(nvars+1):(2 * nvars),2]),     beta.b, x.list.test[[2]])
+        hier.phd.cor <- hier.phd.cor + cor.directions(Re(hier.sdr.phd$beta.hat[(nvars+1):(2 * nvars),2]), beta.b, x.list.test[[2]])
+        semi.hier.phd.cor <- semi.hier.phd.cor + cor.directions(Re(semi.hier.phd$beta.hat[(nvars+1):(2 * nvars),2]), beta.b, x.list.test[[2]])
+        semi.hier.phd.cor2 <- semi.hier.phd.cor2 + cor.directions(Re(semi.hier.phd2$beta[(nvars+1):(2 * nvars),2]), beta.b, x.list.test[[2]])
+        semi.hier.phd.cor.u <- semi.hier.phd.cor.u + cor.directions(Re(semi.hier.phd$beta.unconstrained[(nvars+1):(2 * nvars),2]), beta.b, x.list.test[[2]])
+        phd.cor      <- phd.cor      + cor.directions(phd.2$beta.hat[1:nvars,1], beta.b, x.list.test[[2]])
+        sir.cor      <- sir.cor      + cor.directions(sir.2$beta.hat[1:nvars,1], beta.b, x.list.test[[2]])
+        s.phd.cor    <- s.phd.cor    + cor.directions(s.phd.2$beta[1:nvars,1],   beta.b, x.list.test[[2]])
+
+        ## beta AB -> A
+        hier.sir.cor <- hier.sir.cor + max(sapply(1:3, function(idx) cor.directions(Re(hier.sdr$beta.hat[(2*nvars+1):(3 * nvars),1]),     beta.ab[,idx], x.list.test[[3]])))
+        hier.phd.cor <- hier.phd.cor + max(sapply(1:3, function(idx) cor.directions(Re(hier.sdr.phd$beta.hat[(2*nvars+1):(3 * nvars),1]), beta.ab[,idx], x.list.test[[3]])))
+        semi.hier.phd.cor <- semi.hier.phd.cor + max(sapply(1:3, function(idx) cor.directions(Re(semi.hier.phd$beta.hat[(2*nvars+1):(3 * nvars),1]), beta.ab[,idx], x.list.test[[3]])))
+        semi.hier.phd.cor2 <- semi.hier.phd.cor2 + max(sapply(1:3, function(idx) cor.directions(Re(semi.hier.phd2$beta[(2*nvars+1):(3 * nvars),1]), beta.ab[,idx], x.list.test[[3]])))
+        semi.hier.phd.cor.u <- semi.hier.phd.cor.u + max(sapply(1:3, function(idx) cor.directions(Re(semi.hier.phd$beta.unconstrained[(2*nvars+1):(3 * nvars),1]), beta.ab[,idx], x.list.test[[3]])))
+        phd.cor      <- phd.cor      + max(sapply(1:3, function(idx) cor.directions(phd.3$beta.hat[1:nvars,1], beta.ab[,idx], x.list.test[[3]])))
+        sir.cor      <- sir.cor      + max(sapply(1:3, function(idx) cor.directions(sir.3$beta.hat[1:nvars,1], beta.ab[,idx], x.list.test[[3]])))
+        s.phd.cor    <- s.phd.cor    + max(sapply(1:3, function(idx) cor.directions(s.phd.3$beta[1:nvars,1], beta.ab[,idx], x.list.test[[3]])))
+
+        ## beta AB -> B
+        hier.sir.cor <- hier.sir.cor + max(sapply(1:3, function(idx) cor.directions(Re(hier.sdr$beta.hat[(2*nvars+1):(3 * nvars),2]),     beta.ab[,idx], x.list.test[[3]])))
+        hier.phd.cor <- hier.phd.cor + max(sapply(1:3, function(idx) cor.directions(Re(hier.sdr.phd$beta.hat[(2*nvars+1):(3 * nvars),2]), beta.ab[,idx], x.list.test[[3]])))
+        semi.hier.phd.cor <- semi.hier.phd.cor + max(sapply(1:3, function(idx) cor.directions(Re(semi.hier.phd$beta.hat[(2*nvars+1):(3 * nvars),2]), beta.ab[,idx], x.list.test[[3]])))
+        semi.hier.phd.cor2 <- semi.hier.phd.cor2 + max(sapply(1:3, function(idx) cor.directions(Re(semi.hier.phd2$beta[(2*nvars+1):(3 * nvars),2]), beta.ab[,idx], x.list.test[[3]])))
+        semi.hier.phd.cor.u <- semi.hier.phd.cor.u + max(sapply(1:3, function(idx) cor.directions(Re(semi.hier.phd$beta.unconstrained[(2*nvars+1):(3 * nvars),2]), beta.ab[,idx], x.list.test[[3]])))
+        phd.cor      <- phd.cor      + max(sapply(1:3, function(idx) cor.directions(phd.3$beta.hat[1:nvars,2], beta.ab[,idx], x.list.test[[3]])))
+        sir.cor      <- sir.cor      + max(sapply(1:3, function(idx) cor.directions(sir.3$beta.hat[1:nvars,2], beta.ab[,idx], x.list.test[[3]])))
+        s.phd.cor    <- s.phd.cor    + max(sapply(1:3, function(idx) cor.directions(s.phd.3$beta[1:nvars,2], beta.ab[,idx], x.list.test[[3]])))
+
+        ## beta AB -> eta AB
+        hier.sir.cor <- hier.sir.cor + max(sapply(1:3, function(idx) cor.directions(Re(hier.sdr$beta.hat[(2*nvars+1):(3 * nvars),3]),     beta.ab[,idx], x.list.test[[3]])))
+        hier.phd.cor <- hier.phd.cor + max(sapply(1:3, function(idx) cor.directions(Re(hier.sdr.phd$beta.hat[(2*nvars+1):(3 * nvars),3]), beta.ab[,idx], x.list.test[[3]])))
+        semi.hier.phd.cor <- semi.hier.phd.cor + max(sapply(1:3, function(idx) cor.directions(Re(semi.hier.phd$beta.hat[(2*nvars+1):(3 * nvars),3]), beta.ab[,idx], x.list.test[[3]])))
+        semi.hier.phd.cor2 <- semi.hier.phd.cor2 + max(sapply(1:3, function(idx) cor.directions(Re(semi.hier.phd2$beta[(2*nvars+1):(3 * nvars),3]), beta.ab[,idx], x.list.test[[3]])))
+        semi.hier.phd.cor.u <- semi.hier.phd.cor.u + max(sapply(1:3, function(idx) cor.directions(Re(semi.hier.phd$beta.unconstrained[(2*nvars+1):(3 * nvars),3]), beta.ab[,idx], x.list.test[[3]])))
+        phd.cor      <- phd.cor      + max(sapply(1:3, function(idx) cor.directions(phd.3$beta.hat[1:nvars,3], beta.ab[,idx], x.list.test[[3]])))
+        sir.cor      <- sir.cor      + max(sapply(1:3, function(idx) cor.directions(sir.3$beta.hat[1:nvars,3], beta.ab[,idx], x.list.test[[3]])))
+        s.phd.cor    <- s.phd.cor    + max(sapply(1:3, function(idx) cor.directions(s.phd.3$beta[1:nvars,3], beta.ab[,idx], x.list.test[[3]])))
+
+        hier.sir.cor <- hier.sir.cor / 5
+        hier.phd.cor <- hier.phd.cor / 5
+        semi.hier.phd.cor <- semi.hier.phd.cor / 5
+        semi.hier.phd.cor2 <- semi.hier.phd.cor2 / 5
+        semi.hier.phd.cor.u <- semi.hier.phd.cor.u / 5
+        phd.cor      <- phd.cor / 5
+        sir.cor      <- sir.cor / 5
+        s.phd.cor    <- s.phd.cor / 5
+
+        hier.sir.cor
+        hier.phd.cor
+        semi.hier.phd.cor
+        semi.hier.phd.cor2
+        semi.hier.phd.cor.u
+        phd.cor
+        sir.cor
+        s.phd.cor
+
+        sim.direction.res.list2[[n]][s,1] <- hier.sir.cor
+        sim.direction.res.list2[[n]][s,2] <- hier.phd.cor
+        sim.direction.res.list2[[n]][s,3] <- semi.hier.phd.cor
+
+        sim.direction.res.list2[[n]][s,4] <- sir.cor
+        sim.direction.res.list2[[n]][s,5] <- phd.cor
+        sim.direction.res.list2[[n]][s,6] <- s.phd.cor
+        sim.direction.res.list2[[n]][s,7] <- semi.hier.phd.cor2
+
+        if (s %% 1 == 0) cat("sim:", s, "complete \n")
+        print(colMeans(sim.subsp.angle.res.list2[[n]][1:s,,drop=FALSE]))
+        print(colMeans(sim.direction.res.list2[[n]][1:s,,drop=FALSE]))
+    }
+}
+
+
+library(reshape2)
+library(ggplot2)
+
+res <- do.call(rbind, lapply(sim.res.list2, melt))
+res.dir <- do.call(rbind, lapply(sim.direction.res.list2, melt))
+res.angle <- do.call(rbind, lapply(sim.subsp.angle.res.list2, melt))
+
+
+
+## directions R^2
+
+df.m.dir <- data.frame(res.dir, nobs = rep(nobs.vec, each = nsims * ncol(sim.direction.res.list2[[1]])))
+df.m.angle <- data.frame(res.angle, nobs = rep(nobs.vec, each = nsims * ncol(sim.subsp.angle.res.list2[[1]])))
+
+colnames(df.m.dir)[2:3] <- colnames(df.m.angle)[2:3] <- c("Method", "R2")
+#df.m.dir2 <- df.m.dir2[which(df.m.dir2$R2 > -0.25),]
+
+df.m.dir$Method <- factor(df.m.dir$Method, levels = levels(df.m.dir$Method)[c(1,4,2,5,6,3,7)])
+df.m.angle$Method <- factor(df.m.angle$Method, levels = levels(df.m.angle$Method)[c(1,4,2,5,6,3,7)])
+
+
+pdf(paste0(fig.path, "sim_semi_2a_directions_nvars50_boxplots.pdf"), height = 8, width = 10)
+
+ggplot(data = df.m.dir, aes(x=Method, y=R2)) + geom_boxplot(aes(fill = Method)) +
+    ylab("R^2") + facet_wrap(~ nobs) + theme_bw()
+
+dev.off()
+
+pdf(paste0(fig.path, "sim_semi_2a_angles_nvars50_boxplots.pdf"), height = 8, width = 10)
+
+ggplot(data = df.m.angle, aes(x=Method, y=R2)) + geom_boxplot(aes(fill = Method)) +
+    ylab("angle") + facet_wrap(~ nobs) + theme_bw()
+
+dev.off()
+
+
+
+
+
+### modeling plots
+
+
+
+df.m <- data.frame(res, nobs = rep(nobs.vec, each = nsims * ncol(sim.res.list[[1]])))
+
+colnames(df.m)[2:3] <- c("Method", "R2")
+df.m <- df.m[which(df.m$R2 > -0.25),]
+
+df.m$Method <- factor(df.m$Method, levels = levels(df.m$Method)[c(1, 7, 2, 8, 3, 5, 4, 6)])
+
+pdf(paste0(fig.path, "sim_semi_1a_nvars50_boxplots.pdf"), height = 8, width = 10)
+
+ggplot(data = df.m, aes(x=Method, y=R2)) + geom_boxplot(aes(fill=Method)) +
+    ylab("R^2 Test Set") + facet_wrap(~ nobs) + theme_bw() +
+    theme(axis.text.x = element_text(angle = 90, hjust = 1))
+
+dev.off()
+
+ggplot(data = df.m, aes(x=Method, y=R2)) + geom_violin(aes(fill=Method)) +
+    ylab("R^2 Test Set") + facet_wrap(~ nobs) + theme_bw()
+
+
+###
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+#################################
+
+
+#################################
+
+
+
+
 
 # simulation parameters
 nsims     <- 100
