@@ -185,7 +185,7 @@ semi.phd <- function(x, y, d = 5L, maxit = 10L, h = NULL, ...)
         directions <- x.tilde %*% beta.mat
         #gcv.vals   <- sapply(h, function(hv) gcv(x = directions, y = y, alpha = hv, deg = 3, ...)[4])
         best.h     <- best.h.init # h[which.min(gcv.vals)]
-        locfit.mod <- locfit.raw(x = directions, y = y, alpha = best.h, ...)
+        locfit.mod <- locfit.raw(x = directions, y = y, alpha = best.h, deg = 3, ...)
         locfit.mod.deriv <- locfit.raw(x = directions, y = y, alpha = best.h, deriv = 1, deg = 3, ...)
 
 
@@ -295,8 +295,255 @@ semi.phd <- function(x, y, d = 5L, maxit = 10L, h = NULL, ...)
 }
 
 
-semi.phd.for.hier <- function(x, y, d = 5L, maxit = 10L, h = NULL,
+semi.phd.for.hier <- function(x, y, d = rep(2L, 3L), maxit = 10L, h = NULL,
                               strat.id = rep(1, nrow(x)), constraints, ...)
+{
+    cov <- cov(x)
+    eig.cov <- eigen(cov)
+    nobs  <- nrow(x)
+    nvars <- ncol(x)
+    pp <- nvars / 3
+    sqrt.inv.cov <- eig.cov$vectors %*% diag(1 / sqrt(eig.cov$values)) %*% t(eig.cov$vectors)
+    x.tilde <- scale(x, scale = FALSE) %*% sqrt.inv.cov
+
+    V.hat <- crossprod(x.tilde, drop(scale(y, scale = FALSE)) * x.tilde) / nrow(x.tilde)
+
+    D <- sum(d)
+    #dd <- floor(d/3)
+    beta.list <- Proj.constr.list <- vector(mode = "list", length = length(constraints))
+    cum.d <- c(0, cumsum(d))
+    for (c in 1:length(constraints))
+    {
+        if (d[c] > 0)
+        {
+            Pc <- constraints[[c]] %*% solve(crossprod(constraints[[c]]), t(constraints[[c]]))
+
+            Proj.constr.list[[c]] <- diag(ncol(Pc)) - Pc
+
+            eig.c <- eigen(Proj.constr.list[[c]] %*% V.hat )
+            eta.hat <- eig.c$vectors[, 1:d[c] ]
+            beta.list[[c]] <- Re(eta.hat)# t(t(eta.hat) %*% sqrt.inv.cov)
+        }
+    }
+
+    #eig.V <- eigen(V.hat)
+    beta.init  <- do.call(cbind, beta.list) #eig.V$vectors[,1:d,drop=FALSE]
+    #eig.V <- eigen(V.hat)
+    #beta.init  <- eig.V$vectors[,1:d,drop=FALSE]
+
+    unique.strata <- unique(strat.id)
+    num.strata    <- length(unique.strata)
+
+    #for (c in 1:length(constraints)) constraints[[c]] <- sqrt.inv.cov %*% constraints[[c]]
+
+    if (is.null(h))
+    {
+        h <- exp(seq(log(0.1), log(25), length.out = 25))
+    }
+
+    ## est bandwidth
+
+    best.h.vec <- numeric(num.strata)
+    for (s in 1:num.strata)
+    {
+        strata.idx <- which(strat.id == unique.strata[s])
+        dir.cur    <- x.tilde[strata.idx, ((s - 1) * pp + 1):(s * pp)] %*%
+            beta.init[((s - 1) * pp + 1):(s * pp),,drop=FALSE]
+        dir.cur    <- dir.cur[,which(apply(dir.cur, 2, sd) != 0)]
+
+        gcv.vals   <- sapply(h, function(hv) gcv(x = dir.cur,
+                                                 y = y[strata.idx],
+                                                 alpha = hv, deg = 3, ...)[4])
+
+        best.h.vec[s] <- h[which.min(gcv.vals)]
+    }
+
+
+    est.eqn.no.norm <- function(beta.vec)
+    {
+        #beta.mat   <- rbind(beta.init[1:d,], matrix(beta.vec, ncol = d))
+        beta.mat   <- matrix(as.vector(beta.vec), ncol = D)
+
+        beta.list <- vector(mode = "list", length = length(constraints))
+        for (c in 1:length(constraints))
+        {
+            if (d[c] > 0)
+            {
+                #AA <- constraints[[c]]
+                #adj.fact <- AA %*% solve(crossprod(AA), crossprod(AA, beta.mat[, ((c-1) * dd + 1):(c * dd)]))
+                beta.list[[c]] <- Proj.constr.list[[c]] %*% beta.mat[, (cum.d[c] + 1):cum.d[c + 1]]
+            }
+        }
+        beta.mat <- do.call(cbind, beta.list)
+
+        #directions <- x.tilde %*% beta.mat
+
+        Ey.given.xbeta <- numeric(nobs)
+
+        for (s in 1:num.strata)
+        {
+            strata.idx <- which(strat.id == unique.strata[s])
+            dir.cur    <- x.tilde[strata.idx, ((s - 1) * pp + 1):(s * pp)] %*%
+                beta.mat[((s - 1) * pp + 1):(s * pp),,drop=FALSE]
+            #print(apply(dir.cur, 2, sd))
+            dir.cur    <- dir.cur[,which(apply(dir.cur, 2, sd) != 0)]
+
+
+            #gcv.vals   <- sapply(h, function(hv) gcv(x = dir.cur,
+            #                                         y = y[strata.idx], alpha = hv, deg = 3, ...)[4])
+            best.h     <- h[which.min(gcv.vals)] # best.h.vec[s] #
+            locfit.mod <- locfit.raw(x = dir.cur, y = y[strata.idx], alpha = best.h, deg = 3, ...)
+            Ey.given.xbeta[strata.idx] <- fitted(locfit.mod)
+        }
+
+        resid <- drop(y - Ey.given.xbeta)
+        lhs   <- crossprod(x.tilde, resid * x.tilde) / (nobs)
+        lhs
+    }
+
+    est.eqn <- function(beta.vec)
+    {
+        #beta.mat   <- rbind(beta.init[1:d,], matrix(beta.vec, ncol = d))
+        beta.mat   <- matrix(as.vector(beta.vec), ncol = D )
+
+        beta.list <- vector(mode = "list", length = length(constraints))
+        for (c in 1:length(constraints))
+        {
+            if (d[c] > 0)
+            {
+                #AA <- constraints[[c]]
+                #adj.fact <- AA %*% solve(crossprod(AA), crossprod(AA, beta.mat[, ((c-1) * dd + 1):(c * dd)]))
+                beta.list[[c]] <- Proj.constr.list[[c]] %*% beta.mat[, (cum.d[c] + 1):cum.d[c + 1]]
+            }
+        }
+        beta.mat <- do.call(cbind, beta.list)
+
+        #directions <- x.tilde %*% beta.mat
+
+        Ey.given.xbeta <- numeric(nobs)
+
+        for (s in 1:num.strata)
+        {
+            strata.idx <- which(strat.id == unique.strata[s])
+            dir.cur    <- x.tilde[strata.idx, ((s - 1) * pp + 1):(s * pp)] %*%
+                beta.mat[((s - 1) * pp + 1):(s * pp),,drop=FALSE]
+            #print(apply(dir.cur, 2, sd))
+            dir.cur    <- dir.cur[,which(apply(dir.cur, 2, sd) != 0)]
+
+
+            #gcv.vals   <- sapply(h, function(hv) gcv(x = dir.cur,
+            #                                         y = y[strata.idx], alpha = hv, deg = 3, ...)[4])
+            best.h     <- best.h.vec[s] # h[which.min(gcv.vals)] #
+            locfit.mod <- locfit.raw(x = dir.cur, y = y[strata.idx], alpha = best.h, deg = 3, ...)
+            Ey.given.xbeta[strata.idx] <- fitted(locfit.mod)
+        }
+
+        resid <- drop(y - Ey.given.xbeta)
+        lhs   <- norm(crossprod(x.tilde, resid * x.tilde), type = "F") ^ 2 / (nobs ^ 2)
+        lhs
+    }
+
+    est.eqn.grad <- function(beta.vec)
+    {
+        #beta.mat   <- rbind(beta.init[1:d,], matrix(beta.vec, ncol = d))
+        beta.mat   <- matrix(beta.vec, ncol = D)
+
+        beta.list <- vector(mode = "list", length = length(constraints))
+        for (c in 1:length(constraints))
+        {
+            if (d[c] > 0)
+            {
+                #AA <- constraints[[c]]
+                #adj.fact <- AA %*% solve(crossprod(AA), crossprod(AA, beta.mat[, ((c-1) * dd + 1):(c * dd)]))
+                beta.list[[c]] <- Proj.constr.list[[c]] %*% beta.mat[, (cum.d[c] + 1):cum.d[c + 1]]# - adj.fact
+            }
+        }
+        beta.mat <- do.call(cbind, beta.list)
+
+
+        #directions <- x.tilde %*% beta.mat
+
+        Ey.given.xbeta <- Ey.given.xbeta.deriv <- numeric(nobs)
+
+        for (s in 1:num.strata)
+        {
+            strata.idx <- which(strat.id == unique.strata[s])
+            dir.cur    <- x.tilde[strata.idx, ((s - 1) * pp + 1):(s * pp)] %*%
+                beta.mat[((s - 1) * pp + 1):(s * pp),,drop=FALSE]
+            dir.cur    <- dir.cur[,which(apply(dir.cur, 2, sd) != 0)]
+
+            #gcv.vals   <- sapply(h, function(hv) gcv(x = dir.cur,
+            #                                         y = y[strata.idx], alpha = hv, deg = 3, ...)[4])
+            best.h     <- best.h.vec[s] # h[which.min(gcv.vals)] #
+            locfit.mod <- locfit.raw(x = dir.cur,
+                                     y = y[strata.idx], alpha = best.h, deg = 3, ...)
+            locfit.mod.deriv <- locfit.raw(x = dir.cur,
+                                           y = y[strata.idx], alpha = best.h, deriv = 1, deg = 3, ...)
+
+            Ey.given.xbeta[strata.idx]       <- fitted(locfit.mod)
+            Ey.given.xbeta.deriv[strata.idx] <- fitted(locfit.mod.deriv)
+        }
+
+        resid    <- drop(y - Ey.given.xbeta)
+        psi      <- crossprod(x.tilde, resid * x.tilde) / nobs
+        ## psi gradient with respect to just one column of beta
+        psi.grad <- -crossprod(x.tilde, (Ey.given.xbeta.deriv * rowSums(x.tilde ^ 2) ) ) / nobs
+        gradient <- 2 * t(psi %*% psi.grad)
+        ## psi gradient is essentially just grad of one column repeated d times
+        rep(drop(gradient), D)
+    }
+
+    #slver <- BBoptim(par = init,
+    #               fn = est.eqn,
+    #               #method = "SANN",
+    #               control = list(maxit = maxit,
+    #                              maxfeval = maxit * 25))
+
+    slver <-   optim(par     = beta.init, # beta.init[(d+1):nrow(beta.init),],
+                     fn      = est.eqn,
+                     gr      = est.eqn.grad,
+                     method  = "L-BFGS",
+                     control = list(maxit = maxit, reltol = 1e-8))
+
+    #slver <- nlminb(start     = as.vector(beta.init),
+    #                objective = est.eqn,
+    #                gradient  = est.eqn.grad,
+    #                control   = list(trace = 0))
+
+    #slver <-   ucminf(par     = beta.init, # beta.init[(d+1):nrow(beta.init),],
+    #                  fn      = est.eqn,
+    #                  gr      = est.eqn.grad
+    #                  #method  = "L-BFGS",
+    #                  #control = list(maxit = maxit, reltol = 1e-8)
+    #                  )
+
+    g <- as.vector(est.eqn.no.norm(slver$par))
+    #W <- tcrossprod(g) + 0.1 * diag(length(g))
+    W <- NULL
+
+    beta <- beta.init
+    for (i in 1:maxit)
+    {
+
+    }
+
+    beta.semi <- rbind(beta.init[1:D, ], matrix(slver$par, ncol = D))
+    beta.semi <- matrix(slver$par, ncol = D)
+
+
+    beta.semi <- beta.semi # t(t(beta.semi) %*% sqrt.inv.cov)
+    beta      <- beta.init # t(t(beta.init) %*% sqrt.inv.cov)
+
+
+    list(beta = beta.semi, beta.init = beta, solver.obj = slver,
+         cov = cov, sqrt.inv.cov = sqrt.inv.cov, W = W)
+}
+
+
+
+semi.phd.for.hier.W <- function(x, y, W, d = 5L, maxit = 10L, h = NULL,
+                                init = NULL,
+                                strat.id = rep(1, nrow(x)), constraints, ...)
 {
     cov <- cov(x)
     eig.cov <- eigen(cov)
@@ -325,6 +572,8 @@ semi.phd.for.hier <- function(x, y, d = 5L, maxit = 10L, h = NULL,
     beta.init  <- do.call(cbind, beta.list) #eig.V$vectors[,1:d,drop=FALSE]
     #eig.V <- eigen(V.hat)
     #beta.init  <- eig.V$vectors[,1:d,drop=FALSE]
+
+    if (!is.null(init)) beta.init <- init
 
     unique.strata <- unique(strat.id)
     num.strata    <- length(unique.strata)
@@ -389,7 +638,10 @@ semi.phd.for.hier <- function(x, y, d = 5L, maxit = 10L, h = NULL,
         }
 
         resid <- drop(y - Ey.given.xbeta)
-        lhs   <- norm(crossprod(x.tilde, resid * x.tilde), type = "F") ^ 2 / (nobs ^ 2)
+        #g     <- as.vector(crossprod(x.tilde, resid * x.tilde))
+
+        g     <- as.vector(crossprod(x.tilde, resid * x.tilde))
+        lhs   <- norm(crossprod(g, W %*% g), type = "F") ^ 2 / (nobs ^ 2)
         lhs
     }
 
@@ -432,10 +684,13 @@ semi.phd.for.hier <- function(x, y, d = 5L, maxit = 10L, h = NULL,
         }
 
         resid    <- drop(y - Ey.given.xbeta)
-        psi      <- crossprod(x.tilde, resid * x.tilde) / nobs
+        psi      <- as.vector(crossprod(x.tilde, resid * x.tilde) / nobs)
         ## psi gradient with respect to just one column of beta
-        psi.grad <- -crossprod(x.tilde, (Ey.given.xbeta.deriv * rowSums(x.tilde ^ 2) ) ) / nobs
-        gradient <- 2 * t(psi %*% psi.grad)
+        psi.grad <- drop(-crossprod(x.tilde, (Ey.given.xbeta.deriv * rowSums(x.tilde ^ 2) ) ) / nobs)
+        print(str(psi))
+        print(str(W))
+        print(str(psi.grad))
+        gradient <- 2 * psi %*% W %*% psi.grad
         ## psi gradient is essentially just grad of one column repeated d times
         rep(drop(gradient), d)
     }
@@ -471,7 +726,7 @@ semi.phd.for.hier <- function(x, y, d = 5L, maxit = 10L, h = NULL,
 }
 
 
-semi.phd.hier <- function(x.list, y, d = 1L, maxit = 10L, h = NULL, ...)
+semi.phd.hier <- function(x.list, y, d = rep(1L, 3L), maxit = 10L, h = NULL, ...)
 {
     p <- ncol(x.list[[1]])
     x <- as.matrix(bdiag(x.list))
@@ -479,6 +734,10 @@ semi.phd.hier <- function(x.list, y, d = 1L, maxit = 10L, h = NULL, ...)
     nobs  <- nrow(x)
     nvars <- ncol(x)
     pp <- nvars / 3
+
+    D <- sum(d)
+
+    cum.d <- c(0, cumsum(d))
 
     cov <- cov(as.matrix(x))
     eig.cov <- eigen(cov)
@@ -502,20 +761,25 @@ semi.phd.hier <- function(x.list, y, d = 1L, maxit = 10L, h = NULL, ...)
     beta.list <- beta.init.list <- Proj.constr.list <- vector(mode = "list", length = length(constraints))
     for (c in 1:length(constraints))
     {
-        Pc <- constraints[[c]] %*% solve(crossprod(constraints[[c]]), t(constraints[[c]]))
+        if (d[c] > 0)
+        {
+            Pc <- constraints[[c]] %*% solve(crossprod(constraints[[c]]), t(constraints[[c]]))
 
-        Proj.constr.list[[c]] <- diag(ncol(Pc)) - Pc
+            Proj.constr.list[[c]] <- diag(ncol(Pc)) - Pc
 
-        eig.c <- eigen(Proj.constr.list[[c]] %*% V.hat )
-        eta.hat <- eig.c$vectors[,1:d,drop=FALSE]
-        beta.list[[c]] <- Re(eta.hat)
+            eig.c <- eigen(Proj.constr.list[[c]] %*% V.hat )
+            eta.hat <- eig.c$vectors[,1:d[c], drop=FALSE]
+            beta.list[[c]] <- Re(eta.hat)
 
-        beta.init.list[[c]] <- Proj.constr.list[[c]] %*%
-            matrix(runif(prod(dim(eta.hat)),
-                         min = min(beta.list[[c]]),
-                         max = max(beta.list[[c]])),
-                   ncol = NCOL(eta.hat))
+            beta.init.list[[c]] <- Proj.constr.list[[c]] %*%
+                matrix(runif(prod(dim(eta.hat)),
+                             min = min(beta.list[[c]]),
+                             max = max(beta.list[[c]])),
+                       ncol = NCOL(eta.hat))
+        }
     }
+
+    Proj.constr.list <- Proj.constr.list[!sapply(Proj.constr.list, is.null)]
 
     #eig.V <- eigen(V.hat)
     beta.init  <- do.call(cbind, beta.list) #eig.V$vectors[,1:d,drop=FALSE]
@@ -554,7 +818,7 @@ semi.phd.hier <- function(x.list, y, d = 1L, maxit = 10L, h = NULL, ...)
 
     est.eqn <- function(beta.vec)
     {
-        beta.mat   <- matrix(beta.vec, ncol = d * length(constraints))
+        beta.mat   <- matrix(beta.vec, ncol = D)
             #t(t(matrix(beta.vec, ncol = d * length(constraints))) %*% sqrt.inv.cov)
 
         Ey.given.xbeta <- numeric(nobs)
@@ -586,7 +850,7 @@ semi.phd.hier <- function(x.list, y, d = 1L, maxit = 10L, h = NULL, ...)
 
     est.eqn.grad <- function(beta.vec)
     {
-        beta.mat   <- matrix(beta.vec, ncol = d * length(constraints))
+        beta.mat   <- matrix(beta.vec, ncol = D)
             #t(t(matrix(beta.vec, ncol = d * length(constraints))) %*% sqrt.inv.cov)
 
         Ey.given.xbeta <- Ey.given.xbeta.deriv <- numeric(nobs)
@@ -638,6 +902,20 @@ semi.phd.hier <- function(x.list, y, d = 1L, maxit = 10L, h = NULL, ...)
                      method  = "L-BFGS",
                      control = list(maxit = maxit, factr = 1e-10))
 
+    #slver <- nlminb(start     = as.vector(beta.init),
+    #                objective = est.eqn,
+    #                gradient  = est.eqn.grad,
+    #                control   = list(trace = 0))
+
+    #slver <-   optimx(par     = as.vector(beta.init), # beta.init[(d+1):nrow(beta.init),],
+    #                  fn      = est.eqn,
+    #                  gr      = est.eqn.grad,
+    #                  method  = "spg",
+    #                  control = list(maxit = maxit, reltol = 1e-8,
+    #                                 kkt = FALSE, starttests = FALSE))
+    #slver <- list(obj = slver, par = as.numeric(slver[1,1:length(as.vector(beta.init))]))
+
+    #print(str(slver$par))
     beta <- beta.init
     for (i in 1:maxit)
     {
@@ -645,7 +923,7 @@ semi.phd.hier <- function(x.list, y, d = 1L, maxit = 10L, h = NULL, ...)
     }
 
     #beta.semi <- rbind(beta.init[1:d, ], matrix(slver$par, ncol = d))
-    beta.semi <- matrix(slver$par, ncol = d * length(constraints))
+    beta.semi <- matrix(slver$par, ncol = D)
         #t(t(matrix(slver$par, ncol = d * length(constraints))) %*% sqrt.inv.cov)
 
 
