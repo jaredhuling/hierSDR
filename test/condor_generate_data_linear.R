@@ -80,7 +80,7 @@ mult.b <- diag(runif(nvars, min = 0.5, max = 1.5))
 
 eta.zero.models <- c(2, 4)
 
-if (model.num %in% eta.zero.models)
+if (!(model.num %in% eta.zero.models))
 {
     beta.ab <- cbind(mult.a %*% beta.a, mult.b %*% beta.b, eta.ab)
 
