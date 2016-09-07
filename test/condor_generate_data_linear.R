@@ -75,12 +75,19 @@ if (beta.type == "some.zero")
 }
 
 
-mult.a <- matrix(runif(nvars ^ 2, max = 1/sqrt(nvars)), ncol = nvars)
-mult.b <- matrix(runif(nvars ^ 2, max = 1/sqrt(nvars)), ncol = nvars)
+mult.a <- diag(runif(nvars, min = 0.5, max = 1.5))
+mult.b <- diag(runif(nvars, min = 0.5, max = 1.5))
 
-# mult.a <- diag(runif(nvars, max = 2))
-# mult.b <- diag(runif(nvars, max = 2))
+eta.zero.models <- c(2, 4)
 
+if (model.num %in% eta.zero.models)
+{
+    beta.ab <- cbind(mult.a %*% beta.a, mult.b %*% beta.b, eta.ab)
+
+} else
+{
+    beta.ab <- cbind(mult.a %*% beta.a, mult.b %*% beta.b)
+}
 
 
 if (model.num == 1)
@@ -104,11 +111,12 @@ if (model.num == 1)
     y.true.test <- c(y.true.a, y.true.b, y.true.ab)
     y.test <- y.true.test + rnorm(nobs.test, sd = sd.sim)
 
-    beta.ab <- cbind(mult.a %*% beta.a, mult.b %*% beta.b, eta.ab)
+
 
 
 } else if (model.num == 2)
 {
+
     y.true.a <- 0.5 * apply(exp(x.list[[1]] %*% beta.a) , 1, sum)
     y.true.b <- + 1 * ((x.list[[2]] %*% beta.b[,1]) ^ 3)
     y.true.ab <- x.list[[3]] %*% beta.ab[,1] / (0.5 + (x.list[[3]] %*% beta.ab[,2] + 1.5) ^ 2)
@@ -124,11 +132,65 @@ if (model.num == 1)
     y.true.test <- c(y.true.a, y.true.b, y.true.ab)
     y.test <- y.true.test + rnorm(nobs.test, sd = sd.sim)
 
+} else if (model.num == 3)
+{
+    y.true.a <- 0.25 * apply(exp(x.list[[1]] %*% beta.a) , 1, sum)
+    y.true.b <- + 0.5 * ((x.list[[2]] %*% beta.b[,1]) ^ 2)# ^ 2
+    y.true.ab <- (apply( (x.list[[3]] %*% beta.ab[,1]) ^ 2, 1, sum)) -
+        0.5 * ((x.list[[3]] %*% beta.ab[,2]) ^ 2) + # ^ 2 +
+        0.25 * (apply(exp(x.list[[3]] %*% beta.ab[,3]), 1, sum))
 
-    beta.ab <- cbind(mult.a %*% beta.a, mult.b %*% beta.b)
+    y.true <- c(y.true.a, y.true.b, y.true.ab)
+    y <- y.true + rnorm(nobs, sd = sd.sim)
 
+
+    y.true.a <- 0.25 * apply(exp(x.list.test[[1]] %*% beta.a) , 1, sum)
+    y.true.b <- + 0.5 * ((x.list.test[[2]] %*% beta.b[,1]) ^ 2)# ^ 2
+    y.true.ab <- (apply( (x.list.test[[3]] %*% beta.ab[,1]) ^ 2, 1, sum)) -
+        0.5 * ((x.list.test[[3]] %*% beta.ab[,2]) ^ 2) + # ^ 2 +
+        0.25 * (apply(exp(x.list.test[[3]] %*% beta.ab[,3]), 1, sum))
+
+    y.true.test <- c(y.true.a, y.true.b, y.true.ab)
+    y.test <- y.true.test + rnorm(nobs.test, sd = sd.sim)
+} else if (model.num == 4)
+{
+    y.true.a <- 0.25 * apply(exp(x.list[[1]] %*% beta.a) , 1, sum)
+    y.true.b <- + 0.5 * ((x.list[[2]] %*% beta.b[,1]) ^ 2)# ^ 2
+    y.true.ab <- (apply( (x.list[[3]] %*% beta.ab[,1]) ^ 2, 1, sum)) -
+        0.5 * ((x.list[[3]] %*% beta.ab[,2]) ^ 2)
+
+    y.true <- c(y.true.a, y.true.b, y.true.ab)
+    y <- y.true + rnorm(nobs, sd = sd.sim)
+
+
+    y.true.a <- 0.25 * apply(exp(x.list.test[[1]] %*% beta.a) , 1, sum)
+    y.true.b <- + 0.5 * ((x.list.test[[2]] %*% beta.b[,1]) ^ 2)# ^ 2
+    y.true.ab <- (apply( (x.list.test[[3]] %*% beta.ab[,1]) ^ 2, 1, sum)) -
+        0.5 * ((x.list.test[[3]] %*% beta.ab[,2]) ^ 2)
+
+    y.true.test <- c(y.true.a, y.true.b, y.true.ab)
+    y.test <- y.true.test + rnorm(nobs.test, sd = sd.sim)
+} else if (model.num == 5)
+{
+    y.true.a <- 5 * apply(cos(x.list[[1]] %*% beta.a) , 1, sum)
+    y.true.b <- + 0.5 * ((x.list[[2]] %*% beta.b[,1]) ^ 2)
+    y.true.ab <- 5 * apply(sin(x.list[[3]] %*% beta.ab[,2]) , 1, sum) -
+        0.5 * ((x.list[[3]] %*% beta.ab[,1]) ^ 2) *  (apply(sin(x.list[[3]] %*% beta.ab[,3]), 1, sum))
+
+    y.true <- c(y.true.a, y.true.b, y.true.ab)
+    y <- y.true + rnorm(nobs, sd = sd.sim)
+
+
+    y.true.a <- 5 * apply(cos(x.list.test[[1]] %*% beta.a) , 1, sum)
+    y.true.b <- + 0.5 * ((x.list.test[[2]] %*% beta.b[,1]) ^ 2)
+    y.true.ab <- 5 * apply(sin(x.list.test[[3]] %*% beta.ab[,2]) , 1, sum) -
+        0.5 * ((x.list.test[[3]] %*% beta.ab[,1]) ^ 2) *  (apply(sin(x.list.test[[3]] %*% beta.ab[,3]), 1, sum))
+
+    y.true.test <- c(y.true.a, y.true.b, y.true.ab)
+    y.test <- y.true.test + rnorm(nobs.test, sd = sd.sim)
 }
 
+snr <- var(y.true.test) / var(y.test - y.true.test)
 
 
 

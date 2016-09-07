@@ -248,7 +248,7 @@ semi.phd <- function(x, y, d = 5L, maxit = 10L, h = NULL, ...)
 
     slver <-   optim(par     = beta.init, # beta.init[(d+1):nrow(beta.init),],
                       fn      = est.eqn,
-                      gr      = est.eqn.grad,
+                      #gr      = est.eqn.grad,
                       method  = "L-BFGS",
                       control = list(maxit = maxit, reltol = 1e-8))
 
@@ -501,7 +501,7 @@ semi.phd.for.hier <- function(x, y, d = rep(2L, 3L), maxit = 10L, h = NULL,
 
     slver <-   optim(par     = beta.init, # beta.init[(d+1):nrow(beta.init),],
                      fn      = est.eqn,
-                     gr      = est.eqn.grad,
+                     #gr      = est.eqn.grad,
                      method  = "L-BFGS",
                      control = list(maxit = maxit, reltol = 1e-8))
 
@@ -898,7 +898,7 @@ semi.phd.hier <- function(x.list, y, d = rep(1L, 3L), maxit = 10L, h = NULL, ...
 
     slver <-   optim(par     = beta.init, # beta.init[(d+1):nrow(beta.init),],
                      fn      = est.eqn,
-                     gr      = est.eqn.grad,
+                     #gr      = est.eqn.grad,
                      method  = "L-BFGS",
                      control = list(maxit = maxit, factr = 1e-10))
 

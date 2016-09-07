@@ -18,8 +18,8 @@ nobs.vec      <- c(250, 500, 1000)
 nvars         <- 50
 ncats         <- 2
 x.type        <- c("simple", "complex")
-beta.type.vec <- c("some.zero", "some.small")
-model.num.vec <- c(1, 2)
+beta.type.vec <- c("some.zero", "some.small")[1]
+model.num.vec <- c(3, 4, 5)
 nobs.test     <- 10000
 simtype       <- "regr"
 nsims         <- 100
