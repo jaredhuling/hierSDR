@@ -9,7 +9,7 @@
 ##             or "complex" for AR cont. x + 5 binary x + 5 cont. depend on other x
 ## beta.type -  either "some.zero" for half of betas to be zero
 ##              or "some.small" for half of beta to be very small
-## model.num - either 1 for the first model type or 2 for second model
+## model.num - either 1 for the first model type or 2 for second model (now also 3, 4, and 5)
 ##
 
 
@@ -78,6 +78,7 @@ if (beta.type == "some.zero")
 mult.a <- diag(runif(nvars, min = 0.5, max = 1.5))
 mult.b <- diag(runif(nvars, min = 0.5, max = 1.5))
 
+## these models have eta as zero
 eta.zero.models <- c(2, 4)
 
 if (!(model.num %in% eta.zero.models))

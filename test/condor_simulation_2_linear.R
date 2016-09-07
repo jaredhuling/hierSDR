@@ -47,10 +47,9 @@ model.num <- grid$model.num[sim.idx]
 ## generate data
 source("condor_generate_data_linear.R")
 
-
 ## fit SDR models
 
-if (model.num == 1 | model.num == 3)
+if ( !(model.num %in% eta.zero.models) )
 {
     hier.sdr      <- hier.sir(x.list, y,  d = c(1,1,1), h = 30L)
     hier.sdr.phd  <- hier.phd(x.list, y,  d = c(1,1,1))
@@ -73,7 +72,7 @@ if (model.num == 1 | model.num == 3)
     s.phd.2 <- semi.phd(x.list[[2]], y[(1 + nobs):(2*nobs)],   d = 1, h = exp(seq(log(0.25), log(25), length.out = 25)), maxit = 500, maxk = 450)
     s.phd.3 <- semi.phd(x.list[[3]], y[(1 + 2*nobs):(3*nobs)], d = 3, h = exp(seq(log(0.25), log(25), length.out = 25)), maxit = 500, maxk = 450)
 
-} else if (model.num == 2 | model.num == 4)
+} else
 {
     hier.sdr      <- hier.sir(x.list, y,  d = c(1,1,0), h = 30L)
     hier.sdr.phd  <- hier.phd(x.list, y,  d = c(1,1,0))
