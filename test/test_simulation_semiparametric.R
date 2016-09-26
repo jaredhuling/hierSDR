@@ -230,7 +230,7 @@ for (n in 3:length(nobs.vec))
 
         y.true.a <- apply(exp(x.list[[1]] %*% beta.a) , 1, sum)
         y.true.b <- + 0.1 * ((x.list[[2]] %*% beta.b[,1]) ^ 2)# ^ 2
-        y.true.ab <- (apply( (x.list[[3]] %*% beta.abeta.ab[,1]) ^ 2, 1, sum)) +
+        y.true.ab <- (apply( (x.list[[3]] %*% beta.ab[,1]) ^ 2, 1, sum)) +
             0.1 * ((x.list[[3]] %*% beta.ab[,2]) ^ 2) + # ^ 2 +
             0.1 * (apply(exp(x.list[[3]] %*% beta.ab[,3]), 1, sum))
 
@@ -269,6 +269,13 @@ for (n in 3:length(nobs.vec))
         s.phd.1 <- semi.phd(x.list[[1]], y[1:nobs],                d = 1, h = exp(seq(log(0.25), log(25), length.out = 25)), maxit = 250, maxk = 450)
         s.phd.2 <- semi.phd(x.list[[2]], y[(1 + nobs):(2*nobs)],   d = 1, h = exp(seq(log(0.25), log(25), length.out = 25)), maxit = 250, maxk = 450)
         s.phd.3 <- semi.phd(x.list[[3]], y[(1 + 2*nobs):(3*nobs)], d = 3, h = exp(seq(log(0.25), log(25), length.out = 25)), maxit = 250, maxk = 450)
+
+        cons <- t(cbind(diag(nvars), -diag(nvars)))
+        Pc   <- cons %*% solve(crossprod(cons), t(cons))
+
+        betaA  <- (diag(nvars * 2) - Pc) %*%  rbind(s.phd.1$beta, s.phd.3$beta[,1,drop=FALSE])
+        betaB  <- (diag(nvars * 2) - Pc) %*%  rbind(s.phd.2$beta, s.phd.3$beta[,2,drop=FALSE])
+        betaAB <- cbind(betaA[1:nvars,], betaB[1:nvars,], s.phd.3$beta[,3,drop=FALSE])
 
         est.eqn.tmp <- function(beta.vec)
         {
@@ -3070,3 +3077,111 @@ for (i in 1:length(constraints))
 }
 
 round(cbind(beta.t, NA, beta.constr), 4)
+
+
+
+
+
+
+###############################
+#
+# test dimension selection
+#
+
+
+cor.directions <- function(a, b, x)
+{
+    cov <- cov(x)
+    R.sq <- as.vector(crossprod(a, cov %*% b) ^ 2 / (crossprod(a, cov %*% a) * crossprod(b, cov %*% b)) )
+    R.sq
+}
+
+
+# simulation parameters
+nsims     <- 50
+nobs      <- c(250, 500, 1000, 2000)[2]
+nobs.test <- 1e4
+nvars     <- 10
+sd.sim    <- 2
+
+set.seed(12345)
+d.estimates <- numeric(nsims)
+for (s in 1:nsims)
+{
+    x <- matrix(rnorm(nobs * nvars), ncol = nvars)
+
+
+    beta <- matrix(c(rep(0, nvars / 2),
+                     rnorm(nvars / 2, sd = 0.5)), ncol = 1)
+    beta <- data.matrix(cbind(beta, matrix(c(rep(0, nvars / 2),
+                                             rnorm(nvars / 2, sd = 0.25)), ncol = 1)))
+
+    y.true <- + 0.5 * ((x %*% beta[,1]) ^ 2) #- sin(pi * (x %*% beta[,2]) )  ^ 2# ^ 2
+
+    y <- y.true + rnorm(nobs, sd = sd.sim)
+
+
+
+    #phd <- semi.phd.dim.select.k(x, y, max.d = 3, k = 5, maxit = 15,
+    #                             h = exp(seq(log(0.01), log(25), length.out = 15)), maxk = 450)
+    phd <- phd.dim.select.k(x, y, max.d = 4, k = 5,
+                            h = exp(seq(log(0.01), log(25), length.out = 15)), maxk = 450)
+    phd$gcvs
+    phd$d
+
+    #s.phd <- semi.phd.dim.select(x, y, max.d = 3,
+    #                             h = exp(seq(log(0.05), log(5), length.out = 15)),
+    #                             maxit = 250, maxk = 450)
+
+    d.estimates[s] <- phd$d
+    print(phd$gcvs)
+    print(d.estimates[1:s])
+}
+
+#phd <- phd(x, y, d = 10)
+
+
+phd <- phd.dim.select(x, y, max.d = 3,
+                      h = exp(seq(log(0.01), log(5), length.out = 15)), maxk = 450)
+phd$gcvs
+phd$d
+
+sum(d.estimates == 0)
+mean(d.estimates[d.estimates != 0] == 1)
+mean(d.estimates[d.estimates != 0] == 2)
+mean(d.estimates[d.estimates != 0] == 3)
+mean(d.estimates[d.estimates != 0] == 4)
+
+
+
+s.phd <- semi.phd.dim.select(x, y, max.d = 3,
+                             h = exp(seq(log(0.05), log(5), length.out = 15)),
+                             maxit = 250, maxk = 450)
+str(s.phd)
+s.phd$d
+s.phd$bic
+
+s.phd.b <- semi.phd.dim.select.boot(x, y, max.d = 3,
+                                    h = exp(seq(log(0.05), log(5), length.out = 15)),
+                                    maxit = 250, maxk = 450)
+str(s.phd.b)
+s.phd.b$d
+s.phd.b$rsq
+
+bic2 <- sapply(1:length(s.phd$models), function(i) s.phd$models[[i]]$solver.obj$value + 0.15 * log(nobs) * i )
+bic2
+which.min(bic2)
+bic2 <- sapply(1:length(s.phd$models), function(i) s.phd$models[[i]]$solver.obj$value + 3 * (nobs^(-0.5)) * log(nobs) * i )
+bic2
+
+apply(s.phd$beta, 2, function(b) max(apply(beta, 2, function(be) cor.directions(b, be, x))))
+apply(s.phd$beta.init, 2, function(b) max(apply(beta, 2, function(be) cor.directions(b, be, x))))
+
+
+Proj <- function(b) b %*% solve(crossprod(b), t(b))
+
+
+norm(Proj(s.phd$beta) - Proj(beta), type = "F")
+norm(Proj(s.phd$beta.init) - Proj(beta), type = "F")
+
+norm(Proj(matrix(rnorm(nvars), ncol=1)) - Proj(beta), type = "F")
