@@ -14,10 +14,10 @@ library(Matrix)
 
 
 ## set up simulation grid
-nobs.vec      <- c(250, 500, 1000)
+nobs.vec      <- c(250, 500)
 nvars         <- 20
 ncats         <- 2
-x.type        <- c("simple", "complex")
+x.type        <- c("simple", "complex")[2]
 beta.type.vec <- c("some.zero", "some.small")[1]
 model.num.vec <- c(2, 5)
 nobs.test     <- 10000
@@ -25,10 +25,16 @@ simtype       <- "regr"
 nsims         <- 100
 sd.sim        <- 1
 num.models    <- 6
+max.d         <- c(3, 3, 2)
+
+d.mat <- data.matrix(expand.grid(1:max.d[1], 1:max.d[2], 0:max.d[3]))
+dimnames(d.mat) <- NULL
+
+d.nums <- 1:nrow(d.mat)
 
 #    set up grid of parameters over which to simulate #
-grid           <- expand.grid(nobs.vec, nvars, x.type, beta.type.vec, model.num.vec)
-colnames(grid) <- c("nobs", "nvars", "x.type", "beta.type", "model.num")
+grid           <- expand.grid(nobs.vec, nvars, x.type, beta.type.vec, model.num.vec, d.nums)
+colnames(grid) <- c("nobs", "nvars", "x.type", "beta.type", "model.num", "d.num")
 
 n.jobs <- nrow(grid)
 
@@ -43,7 +49,9 @@ x.type    <- grid$x.type[sim.idx]
 nobs      <- grid$nobs[sim.idx]
 beta.type <- grid$beta.type[sim.idx]
 model.num <- grid$model.num[sim.idx]
+d.cur     <- as.vector(d.mat[grid$d.num[sim.idx], ])
 
+print(grid[sim.idx,])
 
 Proj <- function(b) b %*% solve(crossprod(b), t(b))
 
@@ -58,17 +66,14 @@ source("condor_generate_data_linear.R")
 
 ## fit SDR models
 
-semi.hier.phd  <- semi.phd.hier.separate.dim.select.k(x.list, drop(y),
-                                                      max.d = c(3,3,2), k = 5,
-                                                      h = exp(seq(log(0.5), log(25), length.out = 25)),
-                                                      maxit = 50, maxk = 1200)
-# semi.phd.hier.separate.dim.cv.k
-d.mat <- semi.hier.phd$d.mat
+semi.hier.phd  <- semi.phd.hier.separate.dim.cv.k(x.list, drop(y),
+                                                  d = d.cur, k = 5,
+                                                  h = exp(seq(log(0.5), log(25), length.out = 25)),
+                                                  maxit = 50, maxk = 2500)
+#
+
 gcvs  <- semi.hier.phd$gcvs
 
-d.vec <- apply(d.mat, 1, function(r) paste(r, collapse = ","))
-
-ranks <- rank(gcvs)
 
 if ( !(model.num %in% eta.zero.models) )
 {
@@ -78,16 +83,6 @@ if ( !(model.num %in% eta.zero.models) )
 {
     d.true <- c(1, 1, 0)
 }
-
-d.true.v  <- paste(d.true, collapse = ",")
-
-rank.true <- ranks[which(d.vec == d.true.v)]
-
-top.10 <- 1 * (rank.true <= 10)
-top.5  <- 1 * (rank.true <= 5)
-top.3  <- 1 * (rank.true <= 3)
-
-num.correct <- sum(semi.hier.phd$best.d == d.true)
 
 
 
@@ -365,19 +360,12 @@ if (FALSE)
     write.csv(result.mat.proj,  paste(seed.num, "_results_proj_norm.csv",   sep = ""))
 }
 
-top.10 <- 1 * (rank.true <= 10)
-top.5  <- 1 * (rank.true <= 5)
-top.3  <- 1 * (rank.true <= 3)
-
-num.correct <- sum(semi.hier.phd$best.d == d.true)
 
 
-result.mat <- data.frame(grid[sim.idx,], array(NA, dim = c(1, 5)))
+result.mat <- data.frame(grid[sim.idx,], array(NA, dim = c(1, 2)))
 
-colnames(result.mat) <- c(colnames(grid), "SNR", "Top_10", "Top_5", "Top_3", "Num_Correct")
+colnames(result.mat) <- c(colnames(grid), "SNR", "cv")
 
-result.mat[1,(ncol(grid) + 1):ncol(result.mat)] <- c(snr,
-                                                     top.10, top.5,
-                                                     top.3, num.correct)
+result.mat[1,(ncol(grid) + 1):ncol(result.mat)] <- c(snr, gcvs)
 
 write.csv(result.mat, paste(seed.num, "_results_dim_selection.csv", sep = ""))

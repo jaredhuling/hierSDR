@@ -3102,7 +3102,7 @@ nsims     <- 50
 nobs      <- c(250, 500, 1000, 2000)[2]
 nobs.test <- 1e4
 nvars     <- 10
-sd.sim    <- 2
+sd.sim    <- 0.5
 
 set.seed(12345)
 d.estimates <- numeric(nsims)
@@ -3116,27 +3116,70 @@ for (s in 1:nsims)
     beta <- data.matrix(cbind(beta, matrix(c(rep(0, nvars / 2),
                                              rnorm(nvars / 2, sd = 0.25)), ncol = 1)))
 
-    y.true <- + 0.5 * ((x %*% beta[,1]) ^ 2) #- sin(pi * (x %*% beta[,2]) )  ^ 2# ^ 2
+    y.true <- + 0.5 * ((x %*% beta[,1]) ^ 2) #- 10 * sin(pi * (x %*% beta[,2]) )  ^ 2# ^ 2
+
+    y.true <- + ((x %*% beta[,1])) / (0.5 + ((1.5 + x %*% beta[,2]) ^ 2))
 
     y <- y.true + rnorm(nobs, sd = sd.sim)
 
 
+    pd <- phd(x, y)
+    sr <- sir(x, y)
+
+    sr <- dr(y ~ x)
+
+    rats <- pd$eigenvalues[-length(pd$eigenvalues)] / pd$eigenvalues[-1]
+    rats <- sr$evalues[-length(sr$evalues)] / sr$evalues[-1]
+    round(rats[1:7], 3)
+    which.max(rats[1:5])
 
     #phd <- semi.phd.dim.select.k(x, y, max.d = 3, k = 5, maxit = 15,
     #                             h = exp(seq(log(0.01), log(25), length.out = 15)), maxk = 450)
-    phd <- phd.dim.select.k(x, y, max.d = 4, k = 5,
-                            h = exp(seq(log(0.01), log(25), length.out = 15)), maxk = 450)
-    phd$gcvs
-    phd$d
+
+    phs3 <- semi.phd(x, y, d = 3, maxk = 500, vic = TRUE)
+    phs2 <- semi.phd(x, y, d = 2, maxk = 500, vic = TRUE)
+    phs1 <- semi.phd(x, y, d = 1, vic = TRUE)
+
+    fitted3 <- fitted(phs3$final.model)
+
+    mcp3 <- sum((y - fitted3) ^ 2) / mean((y - fitted3) ^ 2) - nrow(x) + 2 * 3 * (nvars - 3)
+
+
+
+
+    fitted1 <- fitted(phs1$final.model)
+
+    mcp1 <- sum((y - fitted1) ^ 2) / mean((y - fitted3) ^ 2) - nrow(x) + 2 * 1 * (nvars - 1)
+
+
+
+    fitted2 <- fitted(phs2$final.model)
+
+    mcp2 <- sum((y - fitted2) ^ 2) / mean((y - fitted3) ^ 2) - nrow(x) + 2 * 2 * (nvars - 2)
+
+    mcp.all <- c(mcp1, mcp2, mcp3)
+
+    vic.all <- c(phs1$vic, phs2$vic, phs3$vic)
+
+    #phd <- phd.dim.select.k(x, y, max.d = 4, k = 5,
+    #                        h = exp(seq(log(0.01), log(25), length.out = 15)), maxk = 450)
+    #phd$gcvs
+    #phd$d
 
     #s.phd <- semi.phd.dim.select(x, y, max.d = 3,
     #                             h = exp(seq(log(0.05), log(5), length.out = 15)),
     #                             maxit = 250, maxk = 450)
 
-    d.estimates[s] <- phd$d
-    print(phd$gcvs)
+    d.estimates[s] <- which.min(vic.all)#phd$d
+    #print(phd$gcvs)
+    print(vic.all)
     print(d.estimates[1:s])
 }
+
+mean(d.estimates[which(d.estimates != 0)] == 1)
+mean(d.estimates[which(d.estimates != 0)] == 2)
+mean(d.estimates[which(d.estimates != 0)] == 3)
+
 
 #phd <- phd(x, y, d = 10)
 
