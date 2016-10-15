@@ -96,6 +96,14 @@ semi.phd.hier.separate.general <- function(x,
         above.idx.list[[which(rsc == 0)]] <- which(rsc == 0)
     }
 
+    ## this list will be used to create constraint matrices
+    above.idx.noself.list <- above.idx.list
+
+    for (l in 1:length(above.idx.list))
+    {
+        above.idx.noself.list[[l]] <- above.idx.noself.list[[l]][which(above.idx.noself.list[[l]] != l)]
+    }
+
 
     ## set up data
     x.list <- y.list <- vector(mode = "list", length = M)

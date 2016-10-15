@@ -104,127 +104,27 @@ if (FALSE)
 {
     if ( !(model.num %in% eta.zero.models) )
     {
-        ## beta A
-        hier.sir.cor <- cor.directions(hier.sir.betaAB[,1], beta.a, x.list.test[[1]])
-        hier.phd.cor <- cor.directions(hier.phd.betaAB[,1], beta.a, x.list.test[[1]])
-        semi.hier.phd.cor   <- cor.directions(semi.hier.phd$beta[[1]], beta.a, x.list.test[[1]])
-        #semi.hier.phd.cor.W <- cor.directions(Re(semi.hier.phd$beta.hat.W[1:nvars,1]), beta.a, x.list.test[[1]])
-        #semi.hier.phd.cor2  <- cor.directions(Re(semi.hier.phd2$beta[1:nvars,1]), beta.a, x.list.test[[1]])
-        #semi.hier.phd.cor.u <- cor.directions(Re(semi.hier.phd$beta.unconstrained[1:nvars,1]), beta.a, x.list.test[[1]])
-        phd.cor      <- cor.directions(phd.1$beta.hat[1:nvars,1], beta.a, x.list.test[[1]])
-        sir.cor      <- cor.directions(sir.1$beta.hat[1:nvars,1], beta.a, x.list.test[[1]])
-        s.phd.cor    <- cor.directions(s.phd.1$beta[1:nvars,1],   beta.a, x.list.test[[1]])
 
-        cor.directions(semi.hier.phd$beta[[1]], beta.a, x.list.test[[1]])
-
-
-        ## beta B
-        hier.sir.cor <- hier.sir.cor + cor.directions(hier.sir.betaAB[,2],     beta.b, x.list.test[[2]])
-        hier.phd.cor <- hier.phd.cor + cor.directions(hier.phd.betaAB[,2], beta.b, x.list.test[[2]])
-        semi.hier.phd.cor   <- semi.hier.phd.cor + cor.directions(semi.hier.phd$beta[[2]], beta.b, x.list.test[[2]])
-        #semi.hier.phd.cor.W <- semi.hier.phd.cor.W + cor.directions(Re(semi.hier.phd$beta.hat.W[(nvars+1):(2 * nvars),2]), beta.b, x.list.test[[2]])
-        #semi.hier.phd.cor2  <- semi.hier.phd.cor2 + cor.directions(Re(semi.hier.phd2$beta[(nvars+1):(2 * nvars),2]), beta.b, x.list.test[[2]])
-        #semi.hier.phd.cor.u <- semi.hier.phd.cor.u + cor.directions(Re(semi.hier.phd$beta.unconstrained[(nvars+1):(2 * nvars),2]), beta.b, x.list.test[[2]])
-        phd.cor      <- phd.cor      + cor.directions(phd.2$beta.hat[1:nvars,1], beta.b, x.list.test[[2]])
-        sir.cor      <- sir.cor      + cor.directions(sir.2$beta.hat[1:nvars,1], beta.b, x.list.test[[2]])
-        s.phd.cor    <- s.phd.cor    + cor.directions(s.phd.2$beta[1:nvars,1],   beta.b, x.list.test[[2]])
-
-        cor.directions(semi.hier.phd$beta[[2]], beta.b, x.list.test[[2]])
-
-        ## beta AB -> A
-        hier.sir.cor <- hier.sir.cor + max(sapply(1:3, function(idx) cor.directions(hier.sir.betaAB[,1],     beta.ab[,idx], x.list.test[[3]])))
-        hier.phd.cor <- hier.phd.cor + max(sapply(1:3, function(idx) cor.directions(hier.phd.betaAB[,1], beta.ab[,idx], x.list.test[[3]])))
-        semi.hier.phd.cor <- semi.hier.phd.cor + max(sapply(1:3, function(idx) cor.directions(semi.hier.phd$beta[[3]][,1], beta.ab[,idx], x.list.test[[3]])))
-        #semi.hier.phd.cor.W <- semi.hier.phd.cor.W + max(sapply(1:3, function(idx) cor.directions(Re(semi.hier.phd$beta.hat.W[(2*nvars+1):(3 * nvars),1]), beta.ab[,idx], x.list.test[[3]])))
-        #semi.hier.phd.cor2 <- semi.hier.phd.cor2 + max(sapply(1:3, function(idx) cor.directions(Re(semi.hier.phd2$beta[(2*nvars+1):(3 * nvars),1]), beta.ab[,idx], x.list.test[[3]])))
-        #semi.hier.phd.cor.u <- semi.hier.phd.cor.u + max(sapply(1:3, function(idx) cor.directions(Re(semi.hier.phd$beta.unconstrained[(2*nvars+1):(3 * nvars),1]), beta.ab[,idx], x.list.test[[3]])))
-        phd.cor      <- phd.cor      + max(sapply(1:3, function(idx) cor.directions(phd.3$beta.hat[1:nvars,1], beta.ab[,idx], x.list.test[[3]])))
-        sir.cor      <- sir.cor      + max(sapply(1:3, function(idx) cor.directions(sir.3$beta.hat[1:nvars,1], beta.ab[,idx], x.list.test[[3]])))
-        s.phd.cor    <- s.phd.cor    + max(sapply(1:3, function(idx) cor.directions(s.phd.3$beta[1:nvars,1], beta.ab[,idx], x.list.test[[3]])))
-
-        max(sapply(1:3, function(idx) cor.directions(semi.hier.phd$beta[[3]][,1], beta.ab[,idx], x.list.test[[3]])))
-
-        ## beta AB -> B
-        hier.sir.cor <- hier.sir.cor + max(sapply(1:3, function(idx) cor.directions(hier.sir.betaAB[,2],     beta.ab[,idx], x.list.test[[3]])))
-        hier.phd.cor <- hier.phd.cor + max(sapply(1:3, function(idx) cor.directions(hier.phd.betaAB[,2], beta.ab[,idx], x.list.test[[3]])))
-        semi.hier.phd.cor   <- semi.hier.phd.cor + max(sapply(1:3, function(idx) cor.directions(semi.hier.phd$beta[[3]][,2], beta.ab[,idx], x.list.test[[3]])))
-        #semi.hier.phd.cor.W <- semi.hier.phd.cor.W + max(sapply(1:3, function(idx) cor.directions(Re(semi.hier.phd$beta.hat.W[(2*nvars+1):(3 * nvars),2]), beta.ab[,idx], x.list.test[[3]])))
-        #semi.hier.phd.cor2  <- semi.hier.phd.cor2 + max(sapply(1:3, function(idx) cor.directions(Re(semi.hier.phd2$beta[(2*nvars+1):(3 * nvars),2]), beta.ab[,idx], x.list.test[[3]])))
-        #semi.hier.phd.cor.u <- semi.hier.phd.cor.u + max(sapply(1:3, function(idx) cor.directions(Re(semi.hier.phd$beta.unconstrained[(2*nvars+1):(3 * nvars),2]), beta.ab[,idx], x.list.test[[3]])))
-        phd.cor      <- phd.cor      + max(sapply(1:3, function(idx) cor.directions(phd.3$beta.hat[1:nvars,2], beta.ab[,idx], x.list.test[[3]])))
-        sir.cor      <- sir.cor      + max(sapply(1:3, function(idx) cor.directions(sir.3$beta.hat[1:nvars,2], beta.ab[,idx], x.list.test[[3]])))
-        s.phd.cor    <- s.phd.cor    + max(sapply(1:3, function(idx) cor.directions(s.phd.3$beta[1:nvars,2], beta.ab[,idx], x.list.test[[3]])))
-
-        max(sapply(1:3, function(idx) cor.directions(semi.hier.phd$beta[[3]][,2], beta.ab[,idx], x.list.test[[3]])))
-
-
-        ## beta AB -> eta AB
-        hier.sir.cor <- hier.sir.cor + max(sapply(1:3, function(idx) cor.directions(hier.sir.betaAB[,3],     beta.ab[,idx], x.list.test[[3]])))
-        hier.phd.cor <- hier.phd.cor + max(sapply(1:3, function(idx) cor.directions(hier.phd.betaAB[,3], beta.ab[,idx], x.list.test[[3]])))
-        semi.hier.phd.cor <- semi.hier.phd.cor + max(sapply(1:3, function(idx) cor.directions(semi.hier.phd$beta[[3]][,3], beta.ab[,idx], x.list.test[[3]])))
-        #semi.hier.phd.cor.W <- semi.hier.phd.cor.W + max(sapply(1:3, function(idx) cor.directions(Re(semi.hier.phd$beta.hat.W[(2*nvars+1):(3 * nvars),3]), beta.ab[,idx], x.list.test[[3]])))
-        #semi.hier.phd.cor2 <- semi.hier.phd.cor2 + max(sapply(1:3, function(idx) cor.directions(Re(semi.hier.phd2$beta[(2*nvars+1):(3 * nvars),3]), beta.ab[,idx], x.list.test[[3]])))
-        #semi.hier.phd.cor.u <- semi.hier.phd.cor.u + max(sapply(1:3, function(idx) cor.directions(Re(semi.hier.phd$beta.unconstrained[(2*nvars+1):(3 * nvars),3]), beta.ab[,idx], x.list.test[[3]])))
-        phd.cor      <- phd.cor      + max(sapply(1:3, function(idx) cor.directions(phd.3$beta.hat[1:nvars,3], beta.ab[,idx], x.list.test[[3]])))
-        sir.cor      <- sir.cor      + max(sapply(1:3, function(idx) cor.directions(sir.3$beta.hat[1:nvars,3], beta.ab[,idx], x.list.test[[3]])))
-        s.phd.cor    <- s.phd.cor    + max(sapply(1:3, function(idx) cor.directions(s.phd.3$beta[1:nvars,3], beta.ab[,idx], x.list.test[[3]])))
-
-        max(sapply(1:3, function(idx) cor.directions(semi.hier.phd$beta[[3]][,3], beta.ab[,idx], x.list.test[[3]])))
-
-
-        hier.sir.cor <- hier.sir.cor / 5
-        hier.phd.cor <- hier.phd.cor / 5
-        semi.hier.phd.cor <- semi.hier.phd.cor / 5
-        #semi.hier.phd.cor.W <- semi.hier.phd.cor.W / 5
-        #semi.hier.phd.cor2 <- semi.hier.phd.cor2 / 5
-        #semi.hier.phd.cor.u <- semi.hier.phd.cor.u / 5
-        phd.cor      <- phd.cor / 5
-        sir.cor      <- sir.cor / 5
-        s.phd.cor    <- s.phd.cor / 5
-
-        ######## angles
-
-        hier.sir.angle <- (1/5) * ((angles(hier.sir.betaAB[,1], beta.a) + angles(hier.sir.betaAB[,2], beta.b) )
-                                                        + 3 * angles(hier.sir.betaAB, beta.ab))
-
-        hier.phd.angle <- (1/5) * ((angles(hier.phd.betaAB[,1], beta.a) + angles(hier.phd.betaAB[,2], beta.b) )
-                                                        + 3 * angles(hier.phd.betaAB, beta.ab))
-
-        semi.hier.phd.angle <- (1/5) * ((angles(semi.hier.phd$beta[[1]], beta.a) + angles(semi.hier.phd$beta[[2]],beta.b) )
-                                                        + 3 * angles(semi.hier.phd$beta[[3]], beta.ab))
-
-        phd.angle <- (1/5) * ((angles(phd.1$beta.hat[1:nvars,1], beta.a) + angles(phd.2$beta.hat[1:nvars,1],beta.b) )
-                                                        + 3 * angles(phd.3$beta.hat, beta.ab))
-
-        sir.angle <- (1/5) * (( angles(sir.1$beta.hat[1:nvars,1], beta.a) + angles(sir.2$beta.hat[1:nvars,1],beta.b) )
-                                                        + 3 * angles(sir.3$beta.hat, beta.ab))
-
-        semi.phd.angle <- (1/5) * ((angles(s.phd.1$beta[1:nvars,1], beta.a)+ angles(s.phd.2$beta[1:nvars,1],beta.b) )
-                                                        + 3 * angles(s.phd.3$beta, beta.ab))
-
-
-        (1/5) * (( angles(semi.hier.phd$beta[[1]], beta.a) + angles(semi.hier.phd$beta[[2]],beta.b) )
-                 + 3 * angles(semi.hier.phd$beta[[3]], beta.ab))
 
         ######## projection difference norm
 
-        hier.sir.proj <- (1/5) * ((proj.norm(hier.sir.betaAB[,1], beta.a) + proj.norm(hier.sir.betaAB[,2], beta.b) )
-                                   + 3 * proj.norm(hier.sir.betaAB, beta.ab))
+        #hier.sir.proj <- (1/5) * ((proj.norm(hier.sir.betaAB[,1], beta.a) + proj.norm(hier.sir.betaAB[,2], beta.b) )
+        #                           + 3 * proj.norm(hier.sir.betaAB, beta.ab))
 
-        hier.phd.proj <- (1/5) * ((proj.norm(hier.phd.betaAB[,1], beta.a) + proj.norm(hier.phd.betaAB[,2], beta.b) )
-                                   + 3 * proj.norm(hier.phd.betaAB, beta.ab))
+        #hier.phd.proj <- (1/5) * ((proj.norm(hier.phd.betaAB[,1], beta.a) + proj.norm(hier.phd.betaAB[,2], beta.b) )
+        #                           + 3 * proj.norm(hier.phd.betaAB, beta.ab))
 
         semi.hier.phd.proj <- (1/5) * ((proj.norm(semi.hier.phd$beta[[1]], beta.a) + proj.norm(semi.hier.phd$beta[[2]],beta.b) )
                                         + 3 * proj.norm(semi.hier.phd$beta[[3]], beta.ab))
 
-        phd.proj <- (1/5) * ((proj.norm(phd.1$beta.hat[1:nvars,1], beta.a) + proj.norm(phd.2$beta.hat[1:nvars,1],beta.b) )
-                              + 3 * proj.norm(phd.3$beta.hat, beta.ab))
+        #phd.proj <- (1/5) * ((proj.norm(phd.1$beta.hat[1:nvars,1], beta.a) + proj.norm(phd.2$beta.hat[1:nvars,1],beta.b) )
+        #                      + 3 * proj.norm(phd.3$beta.hat, beta.ab))
 
-        sir.proj <- (1/5) * (( proj.norm(sir.1$beta.hat[1:nvars,1], beta.a) + proj.norm(sir.2$beta.hat[1:nvars,1],beta.b) )
-                              + 3 * proj.norm(sir.3$beta.hat, beta.ab))
+        #sir.proj <- (1/5) * (( proj.norm(sir.1$beta.hat[1:nvars,1], beta.a) + proj.norm(sir.2$beta.hat[1:nvars,1],beta.b) )
+        #                      + 3 * proj.norm(sir.3$beta.hat, beta.ab))
 
-        semi.phd.proj <- (1/5) * ((proj.norm(s.phd.1$beta[1:nvars,1], beta.a)+ proj.norm(s.phd.2$beta[1:nvars,1],beta.b) )
-                                   + 3 * proj.norm(s.phd.3$beta, beta.ab))
+        #semi.phd.proj <- (1/5) * ((proj.norm(s.phd.1$beta[1:nvars,1], beta.a)+ proj.norm(s.phd.2$beta[1:nvars,1],beta.b) )
+        #                           + 3 * proj.norm(s.phd.3$beta, beta.ab))
 
         (1/5) * (( proj.norm(semi.hier.phd$beta[[1]], beta.a) + proj.norm(semi.hier.phd$beta[[2]],beta.b) )
                  + 3 * proj.norm(semi.hier.phd$beta[[3]], beta.ab))
@@ -232,102 +132,26 @@ if (FALSE)
     } else
     {
 
-        ## beta A
-        hier.sir.cor <- cor.directions(hier.sir.betaAB[,1], beta.a, x.list.test[[1]])
-        hier.phd.cor <- cor.directions(hier.phd.betaAB[,1], beta.a, x.list.test[[1]])
-        semi.hier.phd.cor   <- cor.directions(semi.hier.phd$beta[[1]], beta.a, x.list.test[[1]])
-        #semi.hier.phd.cor.W <- cor.directions(Re(semi.hier.phd$beta.hat.W[1:nvars,1]), beta.a, x.list.test[[1]])
-        #semi.hier.phd.cor2  <- cor.directions(Re(semi.hier.phd2$beta[1:nvars,1]), beta.a, x.list.test[[1]])
-        #semi.hier.phd.cor.u <- cor.directions(Re(semi.hier.phd$beta.unconstrained[1:nvars,1]), beta.a, x.list.test[[1]])
-        phd.cor      <- cor.directions(phd.1$beta.hat[1:nvars,1], beta.a, x.list.test[[1]])
-        sir.cor      <- cor.directions(sir.1$beta.hat[1:nvars,1], beta.a, x.list.test[[1]])
-        s.phd.cor    <- cor.directions(s.phd.1$beta[1:nvars,1],   beta.a, x.list.test[[1]])
-
-
-        ## beta B
-        hier.sir.cor <- hier.sir.cor + cor.directions(hier.sir.betaAB[,2],     beta.b, x.list.test[[2]])
-        hier.phd.cor <- hier.phd.cor + cor.directions(hier.phd.betaAB[,2], beta.b, x.list.test[[2]])
-        semi.hier.phd.cor   <- semi.hier.phd.cor + cor.directions(semi.hier.phd$beta[[2]], beta.b, x.list.test[[2]])
-        #semi.hier.phd.cor.W <- semi.hier.phd.cor.W + cor.directions(Re(semi.hier.phd$beta.hat.W[(nvars+1):(2 * nvars),2]), beta.b, x.list.test[[2]])
-        #semi.hier.phd.cor2  <- semi.hier.phd.cor2 + cor.directions(Re(semi.hier.phd2$beta[(nvars+1):(2 * nvars),2]), beta.b, x.list.test[[2]])
-        #semi.hier.phd.cor.u <- semi.hier.phd.cor.u + cor.directions(Re(semi.hier.phd$beta.unconstrained[(nvars+1):(2 * nvars),2]), beta.b, x.list.test[[2]])
-        phd.cor      <- phd.cor      + cor.directions(phd.2$beta.hat[1:nvars,1], beta.b, x.list.test[[2]])
-        sir.cor      <- sir.cor      + cor.directions(sir.2$beta.hat[1:nvars,1], beta.b, x.list.test[[2]])
-        s.phd.cor    <- s.phd.cor    + cor.directions(s.phd.2$beta[1:nvars,1],   beta.b, x.list.test[[2]])
-
-        ## beta AB -> A
-        hier.sir.cor <- hier.sir.cor + max(sapply(1:2, function(idx) cor.directions(hier.sir.betaAB[,1],     beta.ab[,idx], x.list.test[[3]])))
-        hier.phd.cor <- hier.phd.cor + max(sapply(1:2, function(idx) cor.directions(hier.phd.betaAB[,1], beta.ab[,idx], x.list.test[[3]])))
-        semi.hier.phd.cor <- semi.hier.phd.cor + max(sapply(1:2, function(idx) cor.directions(semi.hier.phd$beta[[3]][,1], beta.ab[,idx], x.list.test[[3]])))
-        #semi.hier.phd.cor.W <- semi.hier.phd.cor.W + max(sapply(1:2, function(idx) cor.directions(Re(semi.hier.phd$beta.hat.W[(2*nvars+1):(3 * nvars),1]), beta.ab[,idx], x.list.test[[3]])))
-        #semi.hier.phd.cor2 <- semi.hier.phd.cor2 + max(sapply(1:2, function(idx) cor.directions(Re(semi.hier.phd2$beta[(2*nvars+1):(3 * nvars),1]), beta.ab[,idx], x.list.test[[3]])))
-        #semi.hier.phd.cor.u <- semi.hier.phd.cor.u + max(sapply(1:2, function(idx) cor.directions(Re(semi.hier.phd$beta.unconstrained[(2*nvars+1):(3 * nvars),1]), beta.ab[,idx], x.list.test[[3]])))
-        phd.cor      <- phd.cor      + max(sapply(1:2, function(idx) cor.directions(phd.3$beta.hat[1:nvars,1], beta.ab[,idx], x.list.test[[3]])))
-        sir.cor      <- sir.cor      + max(sapply(1:2, function(idx) cor.directions(sir.3$beta.hat[1:nvars,1], beta.ab[,idx], x.list.test[[3]])))
-        s.phd.cor    <- s.phd.cor    + max(sapply(1:2, function(idx) cor.directions(s.phd.3$beta[1:nvars,1], beta.ab[,idx], x.list.test[[3]])))
-
-        ## beta AB -> B
-        hier.sir.cor <- hier.sir.cor + max(sapply(1:2, function(idx) cor.directions(hier.sir.betaAB[,2],     beta.ab[,idx], x.list.test[[3]])))
-        hier.phd.cor <- hier.phd.cor + max(sapply(1:2, function(idx) cor.directions(hier.phd.betaAB[,2], beta.ab[,idx], x.list.test[[3]])))
-        semi.hier.phd.cor   <- semi.hier.phd.cor + max(sapply(1:2, function(idx) cor.directions(semi.hier.phd$beta[[3]][,2], beta.ab[,idx], x.list.test[[3]])))
-        #semi.hier.phd.cor.W <- semi.hier.phd.cor.W + max(sapply(1:2, function(idx) cor.directions(Re(semi.hier.phd$beta.hat.W[(2*nvars+1):(3 * nvars),2]), beta.ab[,idx], x.list.test[[3]])))
-        #semi.hier.phd.cor2  <- semi.hier.phd.cor2 + max(sapply(1:2, function(idx) cor.directions(Re(semi.hier.phd2$beta[(2*nvars+1):(3 * nvars),2]), beta.ab[,idx], x.list.test[[3]])))
-        #semi.hier.phd.cor.u <- semi.hier.phd.cor.u + max(sapply(1:2, function(idx) cor.directions(Re(semi.hier.phd$beta.unconstrained[(2*nvars+1):(3 * nvars),2]), beta.ab[,idx], x.list.test[[3]])))
-        phd.cor      <- phd.cor      + max(sapply(1:2, function(idx) cor.directions(phd.3$beta.hat[1:nvars,2], beta.ab[,idx], x.list.test[[3]])))
-        sir.cor      <- sir.cor      + max(sapply(1:2, function(idx) cor.directions(sir.3$beta.hat[1:nvars,2], beta.ab[,idx], x.list.test[[3]])))
-        s.phd.cor    <- s.phd.cor    + max(sapply(1:2, function(idx) cor.directions(s.phd.3$beta[1:nvars,2], beta.ab[,idx], x.list.test[[3]])))
-
-
-        hier.sir.cor <- hier.sir.cor / 4
-        hier.phd.cor <- hier.phd.cor / 4
-        semi.hier.phd.cor <- semi.hier.phd.cor / 4
-        #semi.hier.phd.cor.W <- semi.hier.phd.cor.W / 5
-        #semi.hier.phd.cor2 <- semi.hier.phd.cor2 / 5
-        #semi.hier.phd.cor.u <- semi.hier.phd.cor.u / 5
-        phd.cor      <- phd.cor / 4
-        sir.cor      <- sir.cor / 4
-        s.phd.cor    <- s.phd.cor / 4
-
-        ######## angles
-
-        hier.sir.angle <- (1/4) * ((angles(hier.sir.betaAB[,1], beta.a) + angles(hier.sir.betaAB[,2], beta.b) )
-                                   + 2 * angles(hier.sir.betaAB, beta.ab))
-
-        hier.phd.angle <- (1/4) * ((angles(hier.phd.betaAB[,1], beta.a) + angles(hier.phd.betaAB[,2], beta.b) )
-                                   + 2 * angles(hier.phd.betaAB, beta.ab))
-
-        semi.hier.phd.angle <- (1/4) * ((angles(semi.hier.phd$beta[[1]], beta.a) + angles(semi.hier.phd$beta[[2]],beta.b) )
-                                        + 2 * angles(semi.hier.phd$beta[[3]], beta.ab))
-
-        phd.angle <- (1/4) * ((angles(phd.1$beta.hat[1:nvars,1], beta.a) + angles(phd.2$beta.hat[1:nvars,1],beta.b) )
-                              + 2 * angles(phd.3$beta.hat, beta.ab))
-
-        sir.angle <- (1/4) * (( angles(sir.1$beta.hat[1:nvars,1], beta.a) + angles(sir.2$beta.hat[1:nvars,1],beta.b) )
-                              + 2 * angles(sir.3$beta.hat, beta.ab))
-
-        semi.phd.angle <- (1/4) * ((angles(s.phd.1$beta[1:nvars,1], beta.a)+ angles(s.phd.2$beta[1:nvars,1],beta.b) )
-                                   + 2 * angles(s.phd.3$beta, beta.ab))
-
 
         ######## projection difference norm
 
-        hier.sir.proj <- (1/4) * ((proj.norm(hier.sir.betaAB[,1], beta.a) + proj.norm(hier.sir.betaAB[,2], beta.b) )
-                                  + 2 * proj.norm(hier.sir.betaAB, beta.ab))
+        #hier.sir.proj <- (1/4) * ((proj.norm(hier.sir.betaAB[,1], beta.a) + proj.norm(hier.sir.betaAB[,2], beta.b) )
+        #                          + 2 * proj.norm(hier.sir.betaAB, beta.ab))
 
-        hier.phd.proj <- (1/4) * ((proj.norm(hier.phd.betaAB[,1], beta.a) + proj.norm(hier.phd.betaAB[,2], beta.b) )
-                                  + 2 * proj.norm(hier.phd.betaAB, beta.ab))
+        #hier.phd.proj <- (1/4) * ((proj.norm(hier.phd.betaAB[,1], beta.a) + proj.norm(hier.phd.betaAB[,2], beta.b) )
+        #                          + 2 * proj.norm(hier.phd.betaAB, beta.ab))
 
         semi.hier.phd.proj <- (1/4) * ((proj.norm(semi.hier.phd$beta[[1]], beta.a) + proj.norm(semi.hier.phd$beta[[2]],beta.b) )
                                        + 2 * proj.norm(semi.hier.phd$beta[[3]], beta.ab))
 
-        phd.proj <- (1/4) * ((proj.norm(phd.1$beta.hat[1:nvars,1], beta.a) + proj.norm(phd.2$beta.hat[1:nvars,1],beta.b) )
-                             + 2 * proj.norm(phd.3$beta.hat, beta.ab))
+        #phd.proj <- (1/4) * ((proj.norm(phd.1$beta.hat[1:nvars,1], beta.a) + proj.norm(phd.2$beta.hat[1:nvars,1],beta.b) )
+        #                     + 2 * proj.norm(phd.3$beta.hat, beta.ab))
 
-        sir.proj <- (1/4) * (( proj.norm(sir.1$beta.hat[1:nvars,1], beta.a) + proj.norm(sir.2$beta.hat[1:nvars,1],beta.b) )
-                             + 2 * proj.norm(sir.3$beta.hat, beta.ab))
+        #sir.proj <- (1/4) * (( proj.norm(sir.1$beta.hat[1:nvars,1], beta.a) + proj.norm(sir.2$beta.hat[1:nvars,1],beta.b) )
+        #                     + 2 * proj.norm(sir.3$beta.hat, beta.ab))
 
-        semi.phd.proj <- (1/4) * ((proj.norm(s.phd.1$beta[1:nvars,1], beta.a)+ proj.norm(s.phd.2$beta[1:nvars,1],beta.b) )
-                                  + 2 * proj.norm(s.phd.3$beta, beta.ab))
+        #semi.phd.proj <- (1/4) * ((proj.norm(s.phd.1$beta[1:nvars,1], beta.a)+ proj.norm(s.phd.2$beta[1:nvars,1],beta.b) )
+        #                          + 2 * proj.norm(s.phd.3$beta, beta.ab))
 
     }
 
@@ -369,8 +193,6 @@ if (FALSE)
     print(result.mat.angle)
 
     ## save results
-    write.csv(result.mat.cor,   paste(seed.num, "_results_correlation.csv", sep = ""))
-    write.csv(result.mat.angle, paste(seed.num, "_results_angle.csv",       sep = ""))
     write.csv(result.mat.proj,  paste(seed.num, "_results_proj_norm.csv",   sep = ""))
 }
 

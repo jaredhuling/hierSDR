@@ -1,7 +1,7 @@
 
 
 ## set up simulation grid
-nobs.vec      <- c(250, 500)
+nobs.vec      <- c(250, 500, 1000)
 nvars         <- 10
 ncats         <- 2
 x.type        <- c("simple", "complex")[2]
@@ -21,6 +21,9 @@ eta.zero.models <- c(2, 4)
 
 d.mat <- data.matrix(expand.grid(1:max.d[1], 1:max.d[2], 0:max.d[3]))
 dimnames(d.mat) <- NULL
+d.mat <- d.mat[which(rowSums(d.mat) < 5),]
+
+d.nums <- 1:nrow(d.mat)
 
 d.nums <- 1:nrow(d.mat)
 
@@ -42,7 +45,7 @@ n.unique.grids <- nrow(grid) / n.d
 
 path <- "C:/Users/Jared/Dropbox/ACO/rehospitalization/sdr_hierarchical/simulation/results/"
 
-res.mat <- read.csv(paste0(path, "results_dim_sel_2_10_11_2016.csv"), stringsAsFactors = FALSE)
+res.mat <- read.csv(paste0(path, "results_dim_sel_4_10_15_2016.csv"), stringsAsFactors = FALSE)
 
 
 df.2.use <- res.mat[1:n.d,]
@@ -106,13 +109,13 @@ for (g in 1:n.unique.grids)
         if (nrow(res.cur) > 1)
         {
             d.mat.cur <- d.mat[res.cur$d.num,,drop=FALSE]
-            min.idx <- which.min(res.cur$cv)
+            min.idx <- which.min(res.cur$vic)
             best.d  <- d.mat.cur[min.idx,]
 
             d.vec <- apply(d.mat.cur, 1, function(r) paste(r, collapse = ","))
 
 
-            ranks <- rank(res.cur$cv)
+            ranks <- rank(res.cur$vic)
 
             model.num <- res.cur$model.num[1]
 
@@ -150,10 +153,10 @@ for (g in 1:n.unique.grids)
     }
 }
 
-round(res.avg <- sapply(rank.res, function(mat) colMeans(mat, na.rm = TRUE)), 3)
-grid[1:4,]
+round(res.avg <- sapply(rank.res, function(mat) colMeans(mat[mat[,match("dims.completed", colnames(mat))] > 7,], na.rm = TRUE)), 3)
+grid[1:6,]
 
-res.2.table <- cbind(grid[1:4,1:2], Model=c(1, 1, 2, 2), round(t(res.avg)[,1:5], 3) )
+res.2.table <- cbind(grid[1:6,1:2], Model=c(1, 1, 1, 2, 2, 2), round(t(res.avg)[,1:5], 3) )
 
 library(stargazer)
 
