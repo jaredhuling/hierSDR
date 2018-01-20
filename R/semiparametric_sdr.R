@@ -172,7 +172,10 @@ semi.phd <- function(x, y, d = 5L, maxit = 10L, h = NULL, vic = FALSE, B = NULL,
         directions <- x.tilde %*% beta.mat
         #gcv.vals   <- sapply(h, function(hv) gcv(x = directions, y = y, alpha = hv, deg = 3, ...)[4])
         best.h     <- best.h.init # h[which.min(gcv.vals)]
-        locfit.mod <- locfit.raw(x = directions, y = y, alpha = best.h, deg = 3, ...)
+        sd <- sd(directions)
+
+        best.h <- sd * (0.75 * nrow(directions)) ^ (-1/(ncol(directions)+4) )
+        locfit.mod <- locfit.raw(x = directions, y = y, alpha = c(0.75, best.h), deg = 2, ...)
 
 
         Ey.given.xbeta <- fitted(locfit.mod)
@@ -1662,6 +1665,8 @@ semi.phd.hier.separate <- function(x.list, y, d = rep(1L, 3L), maxit = 10L, h = 
         best.h.vec[s]     <- h[which.min(gcv.vals)]
     }
 
+    print(best.h.vec)
+
     est.eqn <- function(beta.vec)
     {
         beta.mat.list <- vector(mode = "list", length = 3L)
@@ -1687,9 +1692,14 @@ semi.phd.hier.separate <- function(x.list, y, d = rep(1L, 3L), maxit = 10L, h = 
             #                                         kern = "gauss",
             #                                         alpha = hv, deg = 3, ...)[4])
             best.h     <- best.h.vec[s] # h[which.min(gcv.vals)]
+            # locfit.mod <- locfit.raw(x = dir.cur, y = y[strata.idx],
+            #                          kern = "gauss",
+            #                          alpha = best.h, deg = 3, ...)
+
+
             locfit.mod <- locfit.raw(x = dir.cur, y = y[strata.idx],
                                      kern = "gauss",
-                                     alpha = best.h, deg = 3, ...)
+                                     alpha = c(best.h), deg = 3, ...)
             Ey.given.xbeta[strata.idx] <- fitted(locfit.mod)
         }
 
@@ -1959,7 +1969,7 @@ angles<-function(B1, B2)
         B <- B2; B.hat <- B1
     }
 
-    P1 <- B %*% solve(t(B) %*% B) %*% t(B)
+    P1 <- B %*% solve(crossprod(B), t(B))
     if(ncol(B.hat) == 1) {
         nume  <- as.vector(t(B.hat) %*% P1 %*% B.hat)
         deno  <- as.vector(t(B.hat) %*% B.hat)
