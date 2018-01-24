@@ -10,5 +10,8 @@ License: What license is it under?
 Depends:
     Matrix,
     locfit,
-    numDeriv
+    numDeriv,
+    optimx,
+    trustOptim,
+    lbfgs
 LazyData: TRUE

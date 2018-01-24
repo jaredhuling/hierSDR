@@ -69,8 +69,12 @@ phd <- function(x, y, d = 5L)
 {
     cov <- cov(x)
     eig.cov <- eigen(cov)
-    sqrt.inv.cov <- eig.cov$vectors %*% diag(1 / sqrt(eig.cov$values)) %*% t(eig.cov$vectors)
-    sqrt.cov <- eig.cov$vectors %*% diag(sqrt(eig.cov$values)) %*% t(eig.cov$vectors)
+    eigvals <- eig.cov$values
+    eigvals[eigvals <= 0] <- 1e-5
+
+    sqrt.inv.cov <- eig.cov$vectors %*% diag(1 / sqrt(eigvals)) %*% t(eig.cov$vectors)
+
+    sqrt.cov <- eig.cov$vectors %*% diag(sqrt(eigvals)) %*% t(eig.cov$vectors)
     x.tilde <- scale(x, scale = FALSE) %*% sqrt.inv.cov
 
     y.scaled <- scale(y, scale = FALSE)
@@ -150,7 +154,10 @@ semi.phd <- function(x, y, d = 5L, maxit = 10L, h = NULL, vic = FALSE, B = NULL,
     eig.cov <- eigen(cov)
     nobs  <- nrow(x)
     nvars <- ncol(x)
-    sqrt.inv.cov <- eig.cov$vectors %*% diag(1 / sqrt(eig.cov$values)) %*% t(eig.cov$vectors)
+    eigvals <- eig.cov$values
+    eigvals[eigvals <= 0] <- 1e-5
+
+    sqrt.inv.cov <- eig.cov$vectors %*% diag(1 / sqrt(eigvals)) %*% t(eig.cov$vectors)
     x.tilde <- scale(x, scale = FALSE) %*% sqrt.inv.cov
 
     V.hat <- crossprod(x.tilde, drop(scale(y, scale = FALSE)) * x.tilde) / nrow(x.tilde)
@@ -175,7 +182,9 @@ semi.phd <- function(x, y, d = 5L, maxit = 10L, h = NULL, vic = FALSE, B = NULL,
         sd <- sd(directions)
 
         best.h <- sd * (0.75 * nrow(directions)) ^ (-1/(ncol(directions)+4) )
-        locfit.mod <- locfit.raw(x = directions, y = y, alpha = c(0.75, best.h), deg = 2, ...)
+        locfit.mod <- locfit.raw(x = directions, y = y,
+                                 kern = "trwt", kt = "prod",
+                                 alpha = c(0.75, best.h), deg = 2, ...)
 
 
         Ey.given.xbeta <- fitted(locfit.mod)
@@ -1552,7 +1561,7 @@ semi.phd.hier <- function(x.list, y, d = rep(1L, 3L), maxit = 10L, h = NULL, ...
 
 semi.phd.hier.separate <- function(x.list, y, d = rep(1L, 3L), maxit = 10L, h = NULL, B = NULL, vic = FALSE, ...)
 {
-    p <- ncol(x.list[[1]])
+    p <- nvars <- ncol(x.list[[1]])
 
     d <- as.vector(d)
     names(d) <- NULL
@@ -1560,6 +1569,8 @@ semi.phd.hier.separate <- function(x.list, y, d = rep(1L, 3L), maxit = 10L, h = 
     nobs.vec  <- unlist(lapply(x.list, nrow))
     nvars.vec <- unlist(lapply(x.list, ncol))
     pp <- nvars.vec[1]
+
+    nobs <- sum(nobs.vec)
 
     D <- sum(d)
     d.vic <- d + 1
@@ -1578,7 +1589,9 @@ semi.phd.hier.separate <- function(x.list, y, d = rep(1L, 3L), maxit = 10L, h = 
 
     sqrt.inv.cov <- lapply(1:length(x.list), function(i) {
         eig.cov <- eigen(cov[[i]])
-        eig.cov$vectors %*% diag(1 / sqrt(eig.cov$values)) %*% t(eig.cov$vectors)
+        eigvals <- eig.cov$values
+        eigvals[eigvals <= 0] <- 1e-5
+        eig.cov$vectors %*% diag(1 / sqrt(eigvals)) %*% t(eig.cov$vectors)
     })
 
     x.tilde <- lapply(1:length(x.list), function(i) {

@@ -291,9 +291,12 @@ createAboveList <- function(combin.mat)
 
 semi.phd.hier.newton <- function(x.list, y, d = rep(1L, 3L),
                                  maxit = 10L, h = NULL, B = NULL, vic = FALSE,
+                                 opt.method = c("bfgs", "lbfgs2", "trust.optim", "lbfgs", "spg", "ucminf"),
                                  verbose = TRUE, ...)
 {
-    p <- ncol(x.list[[1]])
+    p <- nvars <- ncol(x.list[[1]])
+
+    opt.method <- match.arg(opt.method)
 
     d <- as.vector(d)
     names(d) <- NULL
@@ -301,6 +304,8 @@ semi.phd.hier.newton <- function(x.list, y, d = rep(1L, 3L),
     nobs.vec  <- unlist(lapply(x.list, nrow))
     nvars.vec <- unlist(lapply(x.list, ncol))
     pp <- nvars.vec[1]
+
+    nobs <- sum(nobs.vec)
 
     D <- sum(d)
     d.vic <- d + 1
@@ -314,16 +319,20 @@ semi.phd.hier.newton <- function(x.list, y, d = rep(1L, 3L),
     x <- as.matrix(bdiag(x.list))
     cov.b <- cov(as.matrix(x))
     eig.cov.b <- eigen(cov.b)
-    sqrt.inv.cov.b <- eig.cov.b$vectors %*% diag(1 / sqrt(eig.cov.b$values)) %*% t(eig.cov.b$vectors)
+    eigs <- eig.cov.b$values
+    eigs[eigs <= 0] <- 1e-5
+    sqrt.inv.cov.b <- eig.cov.b$vectors %*% diag(1 / sqrt(eigs)) %*% t(eig.cov.b$vectors)
     x.tilde.b <- scale(x, scale = FALSE) %*% sqrt.inv.cov.b
 
     sqrt.inv.cov <- lapply(1:length(x.list), function(i) {
         eig.cov <- eigen(cov[[i]])
-        eig.cov$vectors %*% diag(1 / sqrt(eig.cov$values)) %*% t(eig.cov$vectors)
+        eigvals <- eig.cov$values
+        eigvals[eigvals <= 0] <- 1e-5
+        eig.cov$vectors %*% diag(1 / sqrt(eigvals)) %*% t(eig.cov$vectors)
     })
 
     x.tilde <- lapply(1:length(x.list), function(i) {
-        scale(x.list[[i]], scale = FALSE) %*% sqrt.inv.cov[[i]]
+        scale(x.list[[i]], scale = FALSE) %*% sqrt.inv.cov[[i]] / sqrt(nobs.vec[i])
     })
 
 
@@ -350,7 +359,7 @@ semi.phd.hier.newton <- function(x.list, y, d = rep(1L, 3L),
     beta.list <- beta.init.list <- Proj.constr.list <- vector(mode = "list", length = length(constraints))
     for (c in 1:length(constraints))
     {
-        print(d)
+        #print(d)
         if (d[c] > 0)
         {
             Pc <- constraints[[c]] %*% solve(crossprod(constraints[[c]]), t(constraints[[c]]))
@@ -407,7 +416,7 @@ semi.phd.hier.newton <- function(x.list, y, d = rep(1L, 3L),
 
         gcv.vals   <- sapply(h, function(hv) gcv(x = dir.cur,
                                                  y = y[strata.idx],
-                                                 kern = "gauss",
+                                                 kern = "trwt", kt = "prod",
                                                  alpha = hv, deg = 3, ...)[4])
         best.h.vec[s]     <- h[which.min(gcv.vals)]
     }
@@ -424,6 +433,7 @@ semi.phd.hier.newton <- function(x.list, y, d = rep(1L, 3L),
         beta.mat.list <- vec2subpopMatsId(beta.vec, p, d, cond.mat)
 
         #t(t(matrix(beta.vec, ncol = d * length(constraints))) %*% sqrt.inv.cov)
+
 
         Ey.given.xbeta <- numeric(nobs)
 
@@ -447,7 +457,12 @@ semi.phd.hier.newton <- function(x.list, y, d = rep(1L, 3L),
 
             locfit.mod <- locfit.raw(x = dir.cur, y = y[strata.idx],
                                      kern = "trwt", kt = "prod",
-                                     alpha = c(0.75, best.h), deg = 2, ...)
+                                     alpha = c(0.85, best.h), deg = 2, ...)
+
+            # locfit.mod <- locfit.raw(x = dir.cur, y = y[strata.idx],
+            #                          kern = "trwt", kt = "prod",
+            #                          alpha = best.h, deg = 2, ...)
+
 
             # if (ncol(dir.cur) == 1)
             # {
@@ -469,15 +484,15 @@ semi.phd.hier.newton <- function(x.list, y, d = rep(1L, 3L),
         lhs   <- sum(unlist(lapply(1:length(x.tilde), function(i) {
             strata.idx <- which(strat.id == unique.strata[i])
             resid <- drop(y[strata.idx] - Ey.given.xbeta[strata.idx])
-            norm(crossprod(x.tilde[[i]], resid * x.tilde[[i]]), type = "F") ^ 2 / (nobs.vec[i] ^ 2)
+            norm(crossprod(x.tilde[[i]], resid * x.tilde[[i]]), type = "F") ^ 2
         })))
-        lhs
+        lhs / nobs
     }
 
     est.eqn.grad <- function(beta.vec)
     {
         grad.full     <- grad(est.eqn, beta.vec, method = "simple")
-        cat("grad norm: ", sqrt(sum(grad.full ^ 2)), "\n")
+        if (verbose) cat("grad norm: ", sqrt(sum(grad.full ^ 2)), "\n")
         grad.full
     }
 
@@ -494,7 +509,6 @@ semi.phd.hier.newton <- function(x.list, y, d = rep(1L, 3L),
 
         cond.mat <- subpop.struct(2L)
         beta.mat.list <- vec2subpopMatsIdVIC(beta.vec, p, d, cond.mat, v = v)
-
 
         Ey.given.xbeta <- numeric(nobs)
 
@@ -518,7 +532,7 @@ semi.phd.hier.newton <- function(x.list, y, d = rep(1L, 3L),
 
             locfit.mod <- locfit.raw(x = dir.cur, y = y[strata.idx],
                                      kern = "trwt", kt = "prod",
-                                     alpha = c(0.75, best.h), deg = 3, ...)
+                                     alpha = c(0.85, best.h), deg = 2, ...)
 
             Ey.given.xbeta[strata.idx] <- fitted(locfit.mod)
         }
@@ -527,9 +541,9 @@ semi.phd.hier.newton <- function(x.list, y, d = rep(1L, 3L),
         lhs   <- sum(unlist(lapply(1:length(x.tilde), function(i) {
             strata.idx <- which(strat.id == unique.strata[i])
             resid <- drop(y[strata.idx] - Ey.given.xbeta[strata.idx])
-            norm(crossprod(x.tilde[[i]], resid * x.tilde[[i]]), type = "F") ^ 2 / (nobs.vec[i]) ^ 2
+            norm(crossprod(x.tilde[[i]], resid * x.tilde[[i]]), type = "F") ^ 2
         })))
-        lhs
+        lhs / nobs
     }
 
 
@@ -544,12 +558,12 @@ semi.phd.hier.newton <- function(x.list, y, d = rep(1L, 3L),
                       (length(beta.init.vec))] <- as.vector(beta.init[(nvars.vec[1] + nvars.vec[2] + 1):
                                                                           (nrow(beta.init)), ])
 
-    print("two eq:")
-    print(head(beta.init[1:nvars.vec[1], 1:d[1]]))
-    print(head(beta.init[(nvars.vec[1] + 1):
-                             (nvars.vec[1] + nvars.vec[2]), (d[1] + 1):(d[1] + d[2]) ]))
-    print(head(beta.init[(nvars.vec[1] + nvars.vec[2] + 1):
-                             (nrow(beta.init)), ]))
+    # print("two eq:")
+    # print(head(beta.init[1:nvars.vec[1], 1:d[1]]))
+    # print(head(beta.init[(nvars.vec[1] + 1):
+    #                          (nvars.vec[1] + nvars.vec[2]), (d[1] + 1):(d[1] + d[2]) ]))
+    # print(head(beta.init[(nvars.vec[1] + nvars.vec[2] + 1):
+    #                          (nrow(beta.init)), ]))
 
     # slver <-   optim(par     = beta.init.vec, # beta.init[(d+1):nrow(beta.init),],
     #                  fn      = est.eqn,
@@ -557,26 +571,66 @@ semi.phd.hier.newton <- function(x.list, y, d = rep(1L, 3L),
     #                  method  = "L-BFGS",
     #                  control = list(maxit = maxit, factr = 1e-10))
 
-    #slver <- newton(par = unlist(beta.list.init), # subpopMats2vec(beta.list, d),
-    #                fn = est.eqn, maxit = maxit, tol = 1e-8,
-    #                verbose = verbose)
+
 
     beta.list.init <- lapply(beta.list.init, function(bb) {
         nc <- ncol(bb)
         bb[(nc + 1):nrow(bb),]
     })
-    slver <-   optim(par     = unlist(beta.list.init), # beta.init[(d+1):nrow(beta.init),],
-                     fn      = est.eqn,
-                     gr      = est.eqn.grad,
-                     method  = "BFGS",
-                     control = list(maxit = maxit, factr = 1e-10))
 
-    vic <- slver$value * nobs + log(nobs) * nvars * (d[1] + d[2] + d[3])
+    # slver <- newton(par = unlist(beta.list.init), # subpopMats2vec(beta.list, d),
+    #                 fn = est.eqn, maxit = maxit, tol = 1e-8,
+    #                 verbose = verbose)
 
-    vic.eqn <- 0.25 * (est.eqn.vic(slver$par, v = -1)  + est.eqn.vic(slver$par, v = 1) +
-                       est.eqn.vic(slver$par, v = 0.5) + est.eqn.vic(slver$par, v = -0.5))
+    if (opt.method == "bfgs")
+    {
+        slver <-   optim(par     = unlist(beta.list.init), # beta.init[(d+1):nrow(beta.init),],
+                         fn      = est.eqn,
+                         gr      = est.eqn.grad,
+                         method  = "BFGS",
+                         control = list(maxit = maxit, factr = 1e-10))
+    } else if (opt.method == "lbfgs")
+    {
+        slver <-   optim(par     = unlist(beta.list.init),
+                         fn      = est.eqn,
+                         gr      = est.eqn.grad,
+                         method  = "L-BFGS",
+                         control = list(maxit = maxit, factr = 1e-10))
+    } else if (opt.method == "lbfgs2")
+    {
+        slver <-   lbfgs(vars      = unlist(beta.list.init),
+                         call_eval = est.eqn,
+                         call_gra  = est.eqn.grad,
+                         max_iterations = maxit)
+    } else if (opt.method == "trust.optim")
+    {
+        control.list <- list(maxit = maxit,
+                             report.level = 1 * verbose)
+        slver <- trust.optim(x       = unlist(beta.list.init),
+                             fn      = est.eqn,
+                             gr      = est.eqn.grad,
+                             method  = "SR1",
+                             control = control.list)
 
-    vic <- vic.eqn * sum(nobs.vec) + log(sum(nobs.vec)) * nvars * (d[1] + d[2] + d[3])
+        slver$value <- slver$fval
+        slver$par   <- slver$solution
+    } else
+    {
+        init.par <- unlist(beta.list.init)
+        slver <-   optimx(par     = init.par,
+                          fn      = est.eqn,
+                          #gr      = est.eqn.grad,
+                          control = list(trace = 1 * verbose),
+                          method  = opt.method)
+        if (is.null(slver$par) & names(slver)[1] == "p1")
+        {
+            slver$par <- unlist(slver[1:length(init.par)])
+        }
+    }
+
+    vic <- slver$value + log(nobs) * nvars * (d[1] + d[2] + d[3])
+
+
 
     beta <- beta.init
 
@@ -590,6 +644,14 @@ semi.phd.hier.newton <- function(x.list, y, d = rep(1L, 3L),
     cond.mat <- subpop.struct(2L)
     #beta.mat.list <- vec2subpopMats(slver$par, p, d, cond.mat)
     beta.mat.list <- vec2subpopMatsId(slver$par, p, d, cond.mat)
+
+    vic.eqns <- c(est.eqn.vic(slver$par, v = -1), est.eqn.vic(slver$par, v = -0.5),
+                  est.eqn.vic(slver$par, v = 0.1),
+                  est.eqn.vic(slver$par, v = 0.5), est.eqn.vic(slver$par, v = 1))
+
+    vic.eqn <- min(vic.eqns)
+
+    vic <- vic.eqn + log(sum(nobs.vec)) * nvars * (sum(sapply(beta.mat.list, ncol)))
 
     model.list <- vector(mode = "list", length = 3)
 
@@ -606,8 +668,8 @@ semi.phd.hier.newton <- function(x.list, y, d = rep(1L, 3L),
 
         fitted.vals <- fitted(model.list[[m]])
 
-        sse.vec[m] <-  sum((y - fitted.vals) ^ 2)
-        mse.vec[m] <- mean((y - fitted.vals) ^ 2)
+        sse.vec[m] <-  sum((y[strata.idx] - fitted.vals) ^ 2)
+        mse.vec[m] <- mean((y[strata.idx] - fitted.vals) ^ 2)
     }
 
 
@@ -622,7 +684,7 @@ semi.phd.hier.newton <- function(x.list, y, d = rep(1L, 3L),
     list(beta = beta.mat.list, beta.init = beta, solver.obj = slver,
          #beta.rand.init = t(t(beta.rand.init) %*% sqrt.inv.cov),
          cov = cov, sqrt.inv.cov = sqrt.inv.cov,
-         vic.est.eqn = vic.eqn,
+         vic.est.eqn = vic.eqn, vic.eqns = vic.eqns,
          vic = vic, sse = sse.vec, mse = mse.vec)
 }
 
@@ -642,17 +704,18 @@ func2 <- function(beta, xx, y)
 }
 
 
-x <- matrix(rnorm(100 * 5), ncol = 5)
-y <- drop(x %*% c(0.5, -0.5, 1, 0, 0)) + rnorm(100)
+xx1 <- matrix(rnorm(7000 * 5), ncol = 5)
+yy1 <- drop(xx1 %*% c(0.5, -0.5, 1, 0, 0)) + rnorm(NROW(xx1))
 
-summary(lm(y ~ x - 1))
+summary(lm(yy1 ~ xx1 - 1))
 
 
-newton(par = rep(0, ncol(x)), fn = func, xx = x, y = y)
+newton(par = rep(0, ncol(xx1)), fn = func, xx = xx1, y = yy1)
 
-newton(par = rep(0, 3), fn = func2, xx = x, y = y)
+newton(par = rep(0, 3), fn = func2, xx = xx1, y = yy1)
 
 B <- rbind(c(1,0,0,0,-1),
            c(0.5,-1,0,0,0))
 
-newton.constr(par = rep(0, ncol(x)), fn = func, constr.mat = B, xx = x, y = y)
+newton.constr(par = rep(0, ncol(xx1)), fn = func, constr.mat = B, xx = xx1, y = yy1)
+
