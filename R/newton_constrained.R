@@ -332,7 +332,7 @@ semi.phd.hier.newton <- function(x.list, y, d = rep(1L, 3L),
     })
 
     x.tilde <- lapply(1:length(x.list), function(i) {
-        scale(x.list[[i]], scale = FALSE) %*% sqrt.inv.cov[[i]] / sqrt(nobs.vec[i])
+        scale(x.list[[i]], scale = FALSE) %*% sqrt.inv.cov[[i]]# / sqrt(nobs.vec[i])
     })
 
 
