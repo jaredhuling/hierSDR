@@ -175,7 +175,7 @@ semi.phd <- function(x, y, d = 5L, maxit = 10L, h = NULL, vic = FALSE, B = NULL,
     est.eqn <- function(beta.vec)
     {
         #beta.mat   <- rbind(beta.init[1:d,], matrix(beta.vec, ncol = d))
-        beta.mat   <- matrix(beta.vec, ncol = d)
+        beta.mat   <- rbind(diag(d), matrix(beta.vec, ncol = d))
         directions <- x.tilde %*% beta.mat
         #gcv.vals   <- sapply(h, function(hv) gcv(x = directions, y = y, alpha = hv, deg = 3, ...)[4])
         best.h     <- best.h.init # h[which.min(gcv.vals)]
@@ -215,11 +215,11 @@ semi.phd <- function(x, y, d = 5L, maxit = 10L, h = NULL, vic = FALSE, B = NULL,
     est.eqn.grad <- function(beta.vec)
     {
         #beta.mat   <- rbind(beta.init[1:d,], matrix(beta.vec, ncol = d))
-        beta.mat   <- matrix(beta.vec, ncol = d)
+        beta.mat   <- rbind(diag(d), matrix(beta.vec, ncol = d))
         directions <- x.tilde %*% beta.mat
         #gcv.vals   <- sapply(h, function(hv) gcv(x = directions, y = y, alpha = hv, deg = 3, ...)[4])
         best.h     <- best.h.init # h[which.min(gcv.vals)]
-        locfit.mod <- locfit.raw(x = directions, y = y, alpha = best.h, deg = 3, ...)
+        locfit.mod <- locfit.raw(x = directions, y = y, alpha = best.h, deg = 2, ...)
         locfit.mod.deriv <- locfit.raw(x = directions, y = y, alpha = best.h, deriv = 1, deg = 3, ...)
 
 
@@ -280,7 +280,7 @@ semi.phd <- function(x, y, d = 5L, maxit = 10L, h = NULL, vic = FALSE, B = NULL,
 
     #slver <- list(par = beta, value = est.eqn(beta))
 
-    slver <-   optim(par     = beta.init, # beta.init[(d+1):nrow(beta.init),],
+    slver <-   optim(par     = beta.init[-(1:ncol(beta.init)),], # beta.init[(d+1):nrow(beta.init),],
                       fn      = est.eqn,
                       #gr      = est.eqn.grad,
                       method  = "L-BFGS",
@@ -308,7 +308,7 @@ semi.phd <- function(x, y, d = 5L, maxit = 10L, h = NULL, vic = FALSE, B = NULL,
     }
 
     #beta.semi <- rbind(beta.init[1:d, ], matrix(slver$par, ncol = d))
-    beta.semi <- matrix(slver$par, ncol = d)
+    beta.semi <- rbind(diag(d), matrix(slver$par, ncol = d))
 
 
     if (vic)
