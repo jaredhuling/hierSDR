@@ -284,7 +284,7 @@ semi.phd <- function(x, y, d = 5L, maxit = 10L, h = NULL, vic = FALSE, B = NULL,
                       fn      = est.eqn,
                       #gr      = est.eqn.grad,
                       method  = "L-BFGS",
-                      control = list(maxit = maxit, reltol = 1e-8))
+                      control = list(maxit = maxit, factr = 1e-10))
 
     #slver <-   tnewton(x0      = as.vector(beta.init), # beta.init[(d+1):nrow(beta.init),],
     #                     gr      = est.eqn.grad,
@@ -357,7 +357,7 @@ semi.phd <- function(x, y, d = 5L, maxit = 10L, h = NULL, vic = FALSE, B = NULL,
 
 
 
-    beta.semi <- t(t(beta.semi) %*% sqrt.inv.cov)
+    #beta.semi <- t(t(beta.semi) %*% sqrt.inv.cov)
     beta      <- t(t(beta.init) %*% sqrt.inv.cov)
 
     rsq.mean <- NULL

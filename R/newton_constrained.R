@@ -661,8 +661,6 @@ semi.phd.hier.newton <- function(x.list, y, d = rep(1L, 3L),
         }
     }
 
-    vic <- slver$value + log(nobs) * nvars * (d[1] + d[2] + d[3])
-
 
 
     beta <- beta.init
@@ -684,7 +682,8 @@ semi.phd.hier.newton <- function(x.list, y, d = rep(1L, 3L),
 
     vic.eqn <- mean(vic.eqns)
 
-    vic <- vic.eqn + log(sum(nobs.vec)) * nvars * (sum(sapply(beta.mat.list, ncol)))
+    vic  <- vic.eqn     + log(sum(nobs.vec)) * nvars * (sum(sapply(beta.mat.list, ncol)))
+    vic2 <- slver$value + log(sum(nobs.vec)) * nvars * (sum(sapply(beta.mat.list, ncol)))
 
     model.list <- vector(mode = "list", length = 3)
 
@@ -718,7 +717,8 @@ semi.phd.hier.newton <- function(x.list, y, d = rep(1L, 3L),
          #beta.rand.init = t(t(beta.rand.init) %*% sqrt.inv.cov),
          cov = cov, sqrt.inv.cov = sqrt.inv.cov,
          vic.est.eqn = vic.eqn, vic.eqns = vic.eqns,
-         vic = vic, sse = sse.vec, mse = mse.vec)
+         vic = vic, vic2 = vic2,
+         sse = sse.vec, mse = mse.vec)
 }
 
 
