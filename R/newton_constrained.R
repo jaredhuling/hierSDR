@@ -1148,8 +1148,9 @@ hier.s.phd <- function(x, y, z, z.combinations, d,
 
     vic.eqn <- mean(vic.eqns)
 
-    vic  <- vic.eqn     + log(sum(nobs.vec)) * nvars * (sum(sapply(beta.mat.list, ncol)))
-    vic2 <- slver$value + log(sum(nobs.vec)) * nvars * (sum(sapply(beta.mat.list, ncol)))
+    vic  <- vic.eqn       + log(sum(nobs.vec)) * nvars * (sum(sapply(beta.mat.list, ncol)))
+    vic2 <- slver$value   + log(sum(nobs.vec)) * nvars * (sum(sapply(beta.mat.list, ncol)))
+    vic3 <- min(vic.eqns) + log(sum(nobs.vec)) * nvars * (sum(sapply(beta.mat.list, ncol)))
 
     model.list <- vector(mode = "list", length = 3)
 
@@ -1187,7 +1188,7 @@ hier.s.phd <- function(x, y, z, z.combinations, d,
          cov = cov, sqrt.inv.cov = sqrt.inv.cov,
          solver.obj = slver,
          vic.est.eqn = vic.eqn, vic.eqns = vic.eqns,
-         vic = vic, vic2 = vic2,
+         vic = vic, vic2 = vic2, vic3 = vic3,
          sse = sse.vec, mse = mse.vec)
 }
 
