@@ -195,18 +195,14 @@ vec2subpopMatsIdVIC <- function(vec, p, d, cond.mat, incl.none = FALSE, v = 1)
     createBelowList <- createBelowList(cond.mat)
 
     cumul.params    <- c(0, cumsum(d * p - d ^ 2))
+    dim.added <- FALSE
     for (s in 1:n.subpops)
     {
         if (d[s] > 0)
         {
             vec.idx   <- (cumul.params[s] + 1):cumul.params[s + 1]
-            beta.orig <- matrix(vec[vec.idx], ncol = d[s])
-            beta.U    <- beta.orig[1,,drop=FALSE]
-            beta.L    <- beta.orig[-1,,drop=FALSE]
-            V         <- matrix(v,  nrow = nrow(beta.L), ncol = 1)
-            beta.new  <- cbind(beta.L - V %*% beta.U, V)
-            component.list[[s]] <- rbind(diag(d[s] + 1),
-                                         beta.new)
+            component.list[[s]] <- rbind(diag(d[s]),
+                                             matrix(vec[vec.idx], ncol = d[s]))
         }
     }
 
@@ -214,6 +210,17 @@ vec2subpopMatsIdVIC <- function(vec, p, d, cond.mat, incl.none = FALSE, v = 1)
     {
         mat.list[[s]] <- do.call(cbind, component.list[createBelowList[[s]]])
     }
+
+    change.idx <- unname(which.min(rowSums(cond.mat)))
+
+    beta.orig <- mat.list[[change.idx]][-(1:ncol(mat.list[[change.idx]])),,drop = FALSE]
+    beta.U    <- beta.orig[1,,drop = FALSE]
+    beta.L    <- beta.orig[-1,,drop = FALSE]
+    V         <- matrix(v,  nrow = nrow(beta.L), ncol = 1)
+    beta.new  <- cbind(beta.L - V %*% beta.U, V)
+    mat.list[[change.idx]] <- rbind(diag(ncol(beta.orig) + 1),
+                                 beta.new)
+
     mat.list
 }
 
@@ -745,8 +752,8 @@ hasAllConds <- function(checkvec, combvec)
 }
 
 
-hier.s.phd <- function(x, y, z, z.combinations, d = rep(1L, 3L),
-                       maxit = 10L, h = NULL, B = NULL, vic = FALSE,
+hier.s.phd <- function(x, y, z, z.combinations, d,
+                       maxit = 250L, h = NULL, B = NULL, vic = FALSE,
                        weights = rep(1L, NROW(y)),
                        opt.method = c("lbfgs.x", "bfgs", "lbfgs2",
                                       "bfgs.x",
@@ -766,7 +773,7 @@ hier.s.phd <- function(x, y, z, z.combinations, d = rep(1L, 3L),
 
     if (nrow(z.combinations) != n.combinations) stop("duplicated row in z.combinations")
 
-    z.combs   <- apply(x, 1, function(rr) paste(rr, collapse = ","))
+    z.combs   <- apply(z, 1, function(rr) paste(rr, collapse = ","))
     n.combs.z <- length(unique(z.combs))
 
     if (n.combinations != n.combs.z) stop("number of combinations of factors in z differs from that in z.combinations")
@@ -776,10 +783,9 @@ hier.s.phd <- function(x, y, z, z.combinations, d = rep(1L, 3L),
     for (c in 1:n.combinations)
     {
         strat.idx.list[[c]] <- which(z.combs == combinations[c])
-
-        x.list[[c]]       <- x[strat.idx.list[[c]],]
-        y.list[[c]]       <- y[strat.idx.list[[c]]]
-        weights.list[[c]] <- weights[strat.idx.list[[c]]]
+        x.list[[c]]         <- x[strat.idx.list[[c]],]
+        y.list[[c]]         <- y[strat.idx.list[[c]]]
+        weights.list[[c]]   <- weights[strat.idx.list[[c]]]
     }
 
 
@@ -791,7 +797,7 @@ hier.s.phd <- function(x, y, z, z.combinations, d = rep(1L, 3L),
     names(d) <- NULL
 
     if (length(d) != nrow(z.combinations)) stop("number of subpopulations implied by 'z.combinations' does not match that of 'd'")
-    if (length(d) != x.list) stop("number of subpopulations implied by 'x.list' does not match that of 'd'")
+    if (length(d) != length(x.list) ) stop("number of subpopulations implied by 'x.list' does not match that of 'd'")
 
     nobs.vec  <- unlist(lapply(x.list, nrow))
     nvars.vec <- unlist(lapply(x.list, ncol))
@@ -833,6 +839,7 @@ hier.s.phd <- function(x, y, z, z.combinations, d = rep(1L, 3L),
     # construct linear constraint matrices
     constraints <- vector(mode = "list", length = nrow(z.combinations))
 
+    names(constraints) <- combinations
 
 
     for (cr in 1:nrow(z.combinations))
@@ -920,11 +927,10 @@ hier.s.phd <- function(x, y, z, z.combinations, d = rep(1L, 3L),
     unique.strata <- unique(strat.id)
     num.strata    <- length(unique.strata)
 
-    beta.list.init <- beta.list
-
-    for (s in 1:length(beta.list.init))
+    beta.component.init <- beta.list
+    for (s in 1:length(beta.list))
     {
-        beta.list.init[[s]] <- beta.list.init[[s]][(p * (s - 1) + 1):(p * s),,drop = FALSE]
+        beta.component.init[[s]] <- beta.list[[s]][(p * (s - 1) + 1):(p * s),,drop = FALSE]
     }
 
 
@@ -988,20 +994,6 @@ hier.s.phd <- function(x, y, z, z.combinations, d = rep(1L, 3L),
             #                          kern = "trwt", kt = "prod",
             #                          alpha = best.h, deg = 2, ...)
 
-
-            # if (ncol(dir.cur) == 1)
-            # {
-            #     locfit.mod <- gam(y[strata.idx] ~ te(dir.cur),...)
-            # } else if (ncol(dir.cur) == 2)
-            # {
-            #     locfit.mod <- gam(y[strata.idx] ~ te(dir.cur[,1],dir.cur[,2]),...)
-            # } else if (ncol(dir.cur) == 3)
-            # {
-            #     locfit.mod <- gam(y[strata.idx] ~ te(dir.cur[,1], dir.cur[,2], dir.cur[,3]),...)
-            # } else if (ncol(dir.cur) == 4)
-            # {
-            #     locfit.mod <- gam(y[strata.idx] ~ te(dir.cur[,1], dir.cur[,2], dir.cur[,3], dir.cur[,4]),...)
-            # }
             Ey.given.xbeta[strata.idx] <- fitted(locfit.mod)
         }
 
@@ -1051,7 +1043,7 @@ hier.s.phd <- function(x, y, z, z.combinations, d = rep(1L, 3L),
 
             locfit.mod <- locfit.raw(x = dir.cur, y = y.list[[s]],
                                      kern = "trwt", kt = "prod",
-                                     alpha = c(nn, best.h), deg = 2, ...)
+                                     alpha = c(nn, best.h), deg = 1, ...)
 
             Ey.given.xbeta[strata.idx] <- fitted(locfit.mod)
         }
@@ -1066,34 +1058,40 @@ hier.s.phd <- function(x, y, z, z.combinations, d = rep(1L, 3L),
         lhs / sum(weights)
     }
 
-    beta.list.init <- lapply(beta.list.init, function(bb) {
-        nc <- ncol(bb)
-        bb[(nc + 1):nrow(bb),]
+    beta.component.init <- lapply(beta.component.init, function(bb) {
+        if (!is.null(bb))
+        {
+            nc <- ncol(bb)
+            bb[(nc + 1):nrow(bb),]
+        } else
+        {
+            NULL
+        }
     })
 
     if (opt.method == "bfgs")
     {
-        slver <-   optim(par     = unlist(beta.list.init), # beta.init[(d+1):nrow(beta.init),],
+        slver <-   optim(par     = unlist(beta.component.init), # beta.init[(d+1):nrow(beta.init),],
                          fn      = est.eqn,
                          gr      = est.eqn.grad,
                          method  = "BFGS",
                          control = list(maxit = maxit, abstol = 1e-10))
     } else if (opt.method == "lbfgs")
     {
-        slver <-   optim(par     = unlist(beta.list.init),
+        slver <-   optim(par     = unlist(beta.component.init),
                          fn      = est.eqn,
                          gr      = est.eqn.grad,
                          method  = "L-BFGS",
                          control = list(maxit = maxit, factr = 1e-10))
     } else if (opt.method == "lbfgs2")
     {
-        slver <-   lbfgs(vars      = unlist(beta.list.init),
+        slver <-   lbfgs(vars      = unlist(beta.component.init),
                          call_eval = est.eqn,
                          call_gra  = est.eqn.grad,
                          max_iterations = maxit)
     } else if (opt.method == "bfgs.x")
     {
-        init.par <- unlist(beta.list.init)
+        init.par <- unlist(beta.component.init)
         slver <-   optimx(par     = init.par,
                           fn      = est.eqn,
                           #gr      = est.eqn.grad,
@@ -1110,7 +1108,7 @@ hier.s.phd <- function(x, y, z, z.combinations, d = rep(1L, 3L),
         }
     } else if (opt.method == "lbfgs.x")
     {
-        init.par <- unlist(beta.list.init)
+        init.par <- unlist(beta.component.init)
         slver <-   optimx(par     = init.par,
                           fn      = est.eqn,
                           #gr      = est.eqn.grad,
