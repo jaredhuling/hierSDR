@@ -1720,9 +1720,9 @@ semi.phd.hier.separate <- function(x.list, y, d = rep(1L, 3L), maxit = 10L, h = 
         lhs   <- sum(unlist(lapply(1:length(x.tilde), function(i) {
             strata.idx <- which(strat.id == unique.strata[i])
             resid <- drop(y[strata.idx] - Ey.given.xbeta[strata.idx])
-            norm(crossprod(x.tilde[[i]], resid * x.tilde[[i]]), type = "F") ^ 2 / (nobs.vec[i] ^ 2)
+            norm(crossprod(x.tilde[[i]], resid * x.tilde[[i]]), type = "F") ^ 2# / (nobs.vec[i] ^ 2)
             })))
-        lhs
+        lhs / sum(nobs.vec)
     }
 
 
