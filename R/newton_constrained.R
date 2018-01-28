@@ -303,12 +303,14 @@ semi.phd.hier.newton <- function(x.list, y, d = rep(1L, 3L),
                                                 "bfgs.x",
                                                 "lbfgs",
                                                 "spg", "ucminf"),
+                                 init.method = c("phd", "random"),
                                  nn = 0.85, calc.mse = FALSE,
                                  verbose = TRUE, ...)
 {
     p <- nvars <- ncol(x.list[[1]])
 
-    opt.method <- match.arg(opt.method)
+    opt.method  <- match.arg(opt.method)
+    init.method <- match.arg(init.method)
 
     d <- as.vector(d)
     names(d) <- NULL
@@ -365,36 +367,57 @@ semi.phd.hier.newton <- function(x.list, y, d = rep(1L, 3L),
 
     strat.id <- unlist(lapply(1:length(x.list), function(id) rep(id, nrow(x.list[[id]]))))
 
-    V.hat <- crossprod(x.tilde.b, drop(scale(y, scale = FALSE)) * x.tilde.b) / nrow(x.tilde.b)
+
 
 
     beta.list <- beta.init.list <- Proj.constr.list <- vector(mode = "list", length = length(constraints))
-    for (c in 1:length(constraints))
+
+    if (init.method == "phd")
     {
-        #print(d)
-        if (d[c] > 0)
+        V.hat <- crossprod(x.tilde.b, drop(scale(y, scale = FALSE)) * x.tilde.b) / nrow(x.tilde.b)
+        for (c in 1:length(constraints))
         {
-            Pc <- constraints[[c]] %*% solve(crossprod(constraints[[c]]), t(constraints[[c]]))
+            #print(d)
+            if (d[c] > 0)
+            {
+                Pc <- constraints[[c]] %*% solve(crossprod(constraints[[c]]), t(constraints[[c]]))
 
-            Proj.constr.list[[c]] <- diag(ncol(Pc)) - Pc
+                Proj.constr.list[[c]] <- diag(ncol(Pc)) - Pc
 
-            eig.c <- eigen(Proj.constr.list[[c]] %*% V.hat )
-            eta.hat <- eig.c$vectors[,1:d[c], drop=FALSE]
-            beta.list[[c]] <- Re(eta.hat)
-
-            beta.init.list[[c]] <- Proj.constr.list[[c]] %*%
-                matrix(runif(prod(dim(eta.hat)),
-                             min = min(beta.list[[c]]),
-                             max = max(beta.list[[c]])),
-                       ncol = NCOL(eta.hat))
+                eig.c <- eigen(Proj.constr.list[[c]] %*% V.hat )
+                eta.hat <- eig.c$vectors[,1:d[c], drop=FALSE]
+                beta.list[[c]] <- Re(eta.hat)
+            }
         }
+
+        Proj.constr.list <- Proj.constr.list[!sapply(Proj.constr.list, is.null)]
+
+        #eig.V <- eigen(V.hat)
+        beta.init  <- do.call(cbind, beta.list) #eig.V$vectors[,1:d,drop=FALSE]
+    } else
+    {
+        for (c in 1:length(constraints))
+        {
+            #print(d)
+            if (d[c] > 0)
+            {
+                Pc <- constraints[[c]] %*% solve(crossprod(constraints[[c]]), t(constraints[[c]]))
+
+                Proj.constr.list[[c]] <- diag(ncol(Pc)) - Pc
+
+                beta.list[[c]] <- Proj.constr.list[[c]] %*%
+                    matrix(runif(prod(dim(eta.hat)),
+                                 min = min(beta.list[[c]]),
+                                 max = max(beta.list[[c]])),
+                           ncol = NCOL(eta.hat))
+            }
+        }
+
+        Proj.constr.list <- Proj.constr.list[!sapply(Proj.constr.list, is.null)]
+        beta.init <- do.call(cbind, beta.list)
     }
 
-    Proj.constr.list <- Proj.constr.list[!sapply(Proj.constr.list, is.null)]
 
-    #eig.V <- eigen(V.hat)
-    beta.init  <- do.call(cbind, beta.list) #eig.V$vectors[,1:d,drop=FALSE]
-    beta.rand.init <- do.call(cbind, beta.init.list)
 
     unique.strata <- unique(strat.id)
     num.strata    <- length(unique.strata)
@@ -759,6 +782,7 @@ hier.s.phd <- function(x, y, z, z.combinations, d,
                                       "bfgs.x",
                                       "lbfgs",
                                       "spg", "ucminf"),
+                       init.method = c("phd", "random"),
                        nn = 0.85, calc.mse = FALSE,
                        constrain.none.subpop = FALSE,
                        verbose = TRUE, ...)
@@ -791,7 +815,8 @@ hier.s.phd <- function(x, y, z, z.combinations, d,
 
     p <- nvars <- ncol(x)
 
-    opt.method <- match.arg(opt.method)
+    opt.method  <- match.arg(opt.method)
+    init.method <- match.arg(init.method)
 
     d <- as.vector(d)
     names(d) <- NULL
@@ -897,6 +922,8 @@ hier.s.phd <- function(x, y, z, z.combinations, d,
 
 
     beta.list <- beta.init.list <- Proj.constr.list <- vector(mode = "list", length = length(constraints))
+
+
     for (c in 1:length(constraints))
     {
         #print(d)
@@ -906,23 +933,26 @@ hier.s.phd <- function(x, y, z, z.combinations, d,
 
             Proj.constr.list[[c]] <- diag(ncol(Pc)) - Pc
 
-            eig.c   <- eigen(Proj.constr.list[[c]] %*% V.hat )
-            eta.hat <- eig.c$vectors[,1:d[c], drop=FALSE]
+            eig.c          <- eigen(Proj.constr.list[[c]] %*% V.hat )
+            eta.hat        <- eig.c$vectors[,1:d[c], drop=FALSE]
             beta.list[[c]] <- Re(eta.hat)
 
-            beta.init.list[[c]] <- Proj.constr.list[[c]] %*%
-                matrix(runif(prod(dim(eta.hat)),
-                             min = min(beta.list[[c]]),
-                             max = max(beta.list[[c]])),
-                       ncol = NCOL(eta.hat))
+            if (init.method == "random")
+            {
+                beta.list[[c]] <- Proj.constr.list[[c]] %*%
+                    matrix(runif(prod(dim(eta.hat)),
+                                 min = min(beta.list[[c]]),
+                                 max = max(beta.list[[c]])),
+                           ncol = NCOL(eta.hat))
+            }
         }
     }
+
 
     Proj.constr.list <- Proj.constr.list[!sapply(Proj.constr.list, is.null)]
 
     #eig.V <- eigen(V.hat)
     beta.init      <- do.call(cbind, beta.list) #eig.V$vectors[,1:d,drop=FALSE]
-    beta.rand.init <- do.call(cbind, beta.init.list)
 
     unique.strata <- unique(strat.id)
     num.strata    <- length(unique.strata)
@@ -1183,8 +1213,8 @@ hier.s.phd <- function(x, y, z, z.combinations, d,
     #beta      <- beta.init # t(t(beta.init) %*% sqrt.inv.cov)
 
 
-    list(beta = beta.mat.list, beta.init = beta.init,
-         #beta.rand.init = t(t(beta.rand.init) %*% sqrt.inv.cov),
+    list(beta = beta.mat.list,
+         beta.init = beta.init,
          cov = cov, sqrt.inv.cov = sqrt.inv.cov,
          solver.obj = slver,
          vic.est.eqn = vic.eqn, vic.eqns = vic.eqns,
