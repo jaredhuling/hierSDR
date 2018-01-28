@@ -150,7 +150,9 @@ try.nn <- function(nn.vals = c(0.1, 0.25, 0.5, 0.75, 0.9, 0.95),
                                  nn           = nn.vals[i],
                                  optimize.nn  = optimize.nn,
                                  maxit        = maxit,
-                                 verbose      = verbose)
+                                 verbose      = verbose > 1)
+
+        if (verbose) cat("nn:", nn.vals[i], "; f(x) =", slver.cur$value, "\n")
 
         values[i] <- slver.cur$value
     }
