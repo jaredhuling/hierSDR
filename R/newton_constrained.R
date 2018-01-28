@@ -295,149 +295,6 @@ createAboveList <- function(combin.mat)
 }
 
 
-opt.est.eqn <- function(init, est.eqn, est.eqn.grad,
-                        opt.method = c("lbfgs.x", "bfgs", "lbfgs2",
-                                       "bfgs.x",
-                                       "lbfgs",
-                                       "spg", "ucminf"),
-                        nn = 0.75,
-                        optimize.nn = FALSE, maxit = 100, verbose = FALSE)
-{
-    opt.method <- match.arg(opt.method)
-
-    if (optimize.nn)
-    {
-        init.par <- c(log(nn / (1 - nn)), init)
-    } else
-    {
-        init.par <- init
-    }
-
-    if (opt.method == "bfgs")
-    {
-        slver <-   optim(par     = init.par, # beta.init[(d+1):nrow(beta.init),],
-                         fn      = est.eqn,
-                         gr      = est.eqn.grad,
-                         method  = "BFGS",
-                         control = list(maxit = maxit, abstol = 1e-10))
-        if (optimize.nn) slver$par <- slver$par[-1]
-    } else if (opt.method == "lbfgs")
-    {
-        slver <-   optim(par     = init.par,
-                         fn      = est.eqn,
-                         gr      = est.eqn.grad,
-                         method  = "L-BFGS",
-                         control = list(maxit = maxit, factr = 1e-10))
-        if (optimize.nn) slver$par <- slver$par[-1]
-    } else if (opt.method == "lbfgs2")
-    {
-        slver <-   lbfgs(vars      = init.par,
-                         call_eval = est.eqn,
-                         call_gra  = est.eqn.grad,
-                         max_iterations = maxit)
-        if (optimize.nn) slver$par <- slver$par[-1]
-    } else if (opt.method == "bfgs.x")
-    {
-        slver <-   optimx(par     = init.par,
-                          fn      = est.eqn,
-                          #gr      = est.eqn.grad,
-                          control = list(trace = 1 * verbose,
-                                         maxit = maxit,
-                                         kkt = FALSE),
-                          method  = "BFGS")
-        if (is.null(slver$par) & names(slver)[1] == "p1")
-        {
-            if (optimize.nn)
-            {
-                if (verbose) print(paste("optimized nn:", exp(slver$p1) / (1 + exp(slver$p1))))
-                slver <- list(par = unlist(slver[2:length(init.par)]),
-                              value = slver$value,
-                              convcode = slver$convcode)
-            } else
-            {
-                slver <- list(par = unlist(slver[1:length(init.par)]),
-                              value = slver$value,
-                              convcode = slver$convcode)
-            }
-        }
-    } else if (opt.method == "lbfgs.x")
-    {
-
-        slver <-   optimx(par     = init.par, # c(log(nn / (1 - nn)), init.par),
-                          fn      = est.eqn,
-                          #gr      = est.eqn.grad,
-                          control = list(trace = 1 * verbose,
-                                         maxit = maxit,
-                                         kkt = FALSE),
-                          method  = "L-BFGS-B")
-        if (is.null(slver$par) & names(slver)[1] == "p1")
-        {
-            if (optimize.nn)
-            {
-                if (verbose) print(paste("optimized nn:", exp(slver$p1) / (1 + exp(slver$p1))))
-                slver <- list(par = unlist(slver[2:length(init.par)]),
-                              value = slver$value,
-                              convcode = slver$convcode)
-            } else
-            {
-                slver <- list(par = unlist(slver[1:length(init.par)]),
-                              value = slver$value,
-                              convcode = slver$convcode)
-            }
-        }
-    } else
-    {
-        slver <-   optimx(par     = init.par,
-                          fn      = est.eqn,
-                          #gr      = est.eqn.grad,
-                          control = list(trace = 1 * verbose,
-                                         maxit = maxit,
-                                         kkt = FALSE),
-                          method  = opt.method)
-        if (is.null(slver$par) & names(slver)[1] == "p1")
-        {
-            if (optimize.nn)
-            {
-                if (verbose) print(paste("optimized nn:", exp(slver$p1) / (1 + exp(slver$p1))))
-                slver <- list(par = unlist(slver[2:length(init.par)]),
-                              value = slver$value,
-                              convcode = slver$convcode)
-            } else
-            {
-                slver <- list(par = unlist(slver[1:length(init.par)]),
-                              value = slver$value,
-                              convcode = slver$convcode)
-            }
-        }
-    }
-    slver
-}
-
-try.nn <- function(nn.vals = c(0.1, 0.25, 0.5, 0.75, 0.9, 0.95),
-                   init, est.eqn, est.eqn.grad,
-                   opt.method = c("lbfgs.x", "bfgs", "lbfgs2",
-                                  "bfgs.x",
-                                  "lbfgs",
-                                  "spg", "ucminf"),
-                   optimize.nn = FALSE, maxit = 10, verbose = FALSE)
-{
-    n.try  <- length(nn.vals)
-    values <- numeric(n.try)
-    for (i in 1:n.try)
-    {
-        slver.cur <- opt.est.eqn(init         = init,
-                                 est.eqn      = est.eqn,
-                                 est.eqn.grad = est.eqn.grad,
-                                 opt.method   = opt.method,
-                                 nn           = nn.vals[i],
-                                 optimize.nn  = optimize.nn,
-                                 maxit        = maxit,
-                                 verbose      = verbose)
-
-        values[i] <- slver.cur$value
-    }
-    nn.vals[which.min(values)]
-}
 
 
 semi.phd.hier.newton <- function(x.list, y, d = rep(1L, 3L),
@@ -601,7 +458,7 @@ semi.phd.hier.newton <- function(x.list, y, d = rep(1L, 3L),
         best.h.vec[s]     <- h[which.min(gcv.vals)]
     }
 
-    est.eqn <- function(beta.vec)
+    est.eqn <- function(beta.vec, nn.val, optimize.nn = FALSE)
     {
         #beta.mat.list <- vector(mode = "list", length = 3L)
 
@@ -624,6 +481,7 @@ semi.phd.hier.newton <- function(x.list, y, d = rep(1L, 3L),
 
         Ey.given.xbeta <- numeric(nobs)
 
+
         for (s in 1:num.strata)
         {
             strata.idx <- which(strat.id == unique.strata[s])
@@ -640,7 +498,7 @@ semi.phd.hier.newton <- function(x.list, y, d = rep(1L, 3L),
 
             sd <- sd(dir.cur)
 
-            best.h <- sd * (0.75 * nrow(dir.cur)) ^ (-1/(ncol(dir.cur)+4) )
+            best.h <- sd * (0.75 * nrow(dir.cur)) ^ (-1 / (ncol(dir.cur) + 4) )
 
             if (optimize.nn)
             {
@@ -651,8 +509,11 @@ semi.phd.hier.newton <- function(x.list, y, d = rep(1L, 3L),
             {
                 locfit.mod <- locfit.raw(x = dir.cur, y = y[strata.idx],
                                          kern = "trwt", kt = "prod",
-                                         alpha = c(nn, best.h), deg = 2, ...)
+                                         alpha = c(nn.val, best.h), deg = 2, ...)
             }
+
+
+
                                      #alpha = c(exp(beta.vec[1]) / (1 + exp(beta.vec[1])), best.h), deg = 2, ...)
 
             # locfit.mod <- locfit.raw(x = dir.cur, y = y[strata.idx],
@@ -687,15 +548,15 @@ semi.phd.hier.newton <- function(x.list, y, d = rep(1L, 3L),
         lhs / sum(weights)
     }
 
-    est.eqn.grad <- function(beta.vec)
+    est.eqn.grad <- function(beta.vec, nn.val, optimize.nn = FALSE)
     {
-        grad.full     <- grad(est.eqn, beta.vec, method = "simple")
+        grad.full     <- grad(est.eqn, beta.vec, method = "simple", nn.val = nn.val, optimize.nn = optimize.nn)
         if (verbose) cat("grad norm: ", sqrt(sum(grad.full ^ 2)), "\n")
         grad.full
     }
 
 
-    est.eqn.vic <- function(beta.vec, v = 1)
+    est.eqn.vic <- function(beta.vec, nn.val, v = 1)
     {
         #beta.mat.list <- vector(mode = "list", length = 3L)
 
@@ -730,7 +591,7 @@ semi.phd.hier.newton <- function(x.list, y, d = rep(1L, 3L),
 
             locfit.mod <- locfit.raw(x = dir.cur, y = y[strata.idx],
                                      kern = "trwt", kt = "prod",
-                                     alpha = c(nn, best.h), deg = 2, ...)
+                                     alpha = c(nn.val, best.h), deg = 2, ...)
 
             Ey.given.xbeta[strata.idx] <- fitted(locfit.mod)
         }
@@ -831,9 +692,11 @@ semi.phd.hier.newton <- function(x.list, y, d = rep(1L, 3L),
 
     if (verbose) print("computing VIC's")
 
-    vic.eqns <- c(est.eqn.vic(slver$par, v = -1), est.eqn.vic(slver$par, v = -0.5),
-                  est.eqn.vic(slver$par, v = 0.1),
-                  est.eqn.vic(slver$par, v = 0.5), est.eqn.vic(slver$par, v = 1))
+    vic.eqns <- c(est.eqn.vic(slver$par, nn.val = nn, v = -1),
+                  est.eqn.vic(slver$par, nn.val = nn, v = -0.5),
+                  est.eqn.vic(slver$par, nn.val = nn, v = 0.1),
+                  est.eqn.vic(slver$par, nn.val = nn, v = 0.5),
+                  est.eqn.vic(slver$par, nn.val = nn, v = 1))
 
     if (verbose) print("computed VIC's")
 
@@ -1115,7 +978,7 @@ hier.s.phd <- function(x, y, z, z.combinations, d,
         best.h.vec[s]     <- h[which.min(gcv.vals)]
     }
 
-    est.eqn <- function(beta.vec)
+    est.eqn <- function(beta.vec, nn.val, optimize.nn = FALSE)
     {
         if (optimize.nn)
         {
@@ -1144,7 +1007,7 @@ hier.s.phd <- function(x, y, z, z.combinations, d,
 
             sd <- sd(dir.cur)
 
-            best.h <- sd * (0.75 * nrow(dir.cur)) ^ (-1/(ncol(dir.cur)+4) )
+            best.h <- sd * (0.75 * nrow(dir.cur)) ^ (-1 / (ncol(dir.cur) + 4) )
 
             if (optimize.nn)
             {
@@ -1155,7 +1018,7 @@ hier.s.phd <- function(x, y, z, z.combinations, d,
             {
                 locfit.mod <- locfit.raw(x = dir.cur, y = y.list[[s]],
                                          kern = "trwt", kt = "prod",
-                                         alpha = c(nn, best.h), deg = 2, ...)
+                                         alpha = c(nn.val, best.h), deg = 2, ...)
             }
 
             # locfit.mod <- locfit.raw(x = dir.cur, y = y[strata.idx],
@@ -1176,15 +1039,15 @@ hier.s.phd <- function(x, y, z, z.combinations, d,
         lhs / sum(weights)
     }
 
-    est.eqn.grad <- function(beta.vec)
+    est.eqn.grad <- function(beta.vec, nn.val, optimize.nn = FALSE)
     {
-        grad.full     <- grad(est.eqn, beta.vec, method = "simple")
+        grad.full     <- grad(est.eqn, beta.vec, method = "simple", nn.val = nn.val, optimize.nn = optimize.nn)
         if (verbose) cat("grad norm: ", sqrt(sum(grad.full ^ 2)), "\n")
         grad.full
     }
 
 
-    est.eqn.vic <- function(beta.vec, v = 1)
+    est.eqn.vic <- function(beta.vec, nn.val, v = 1)
     {
 
         beta.mat.list <- vec2subpopMatsIdVIC(beta.vec, p, d, z.combinations, v = v)
@@ -1211,7 +1074,7 @@ hier.s.phd <- function(x, y, z, z.combinations, d,
 
             locfit.mod <- locfit.raw(x = dir.cur, y = y.list[[s]],
                                      kern = "trwt", kt = "prod",
-                                     alpha = c(nn, best.h), deg = 1, ...)
+                                     alpha = c(nn.val, best.h), deg = 1, ...)
 
             Ey.given.xbeta[strata.idx] <- fitted(locfit.mod)
         }
@@ -1266,9 +1129,11 @@ hier.s.phd <- function(x, y, z, z.combinations, d,
 
     beta.mat.list <- vec2subpopMatsId(slver$par, p, d, z.combinations)
 
-    vic.eqns <- c(est.eqn.vic(slver$par, v = -1), est.eqn.vic(slver$par, v = -0.5),
-                  est.eqn.vic(slver$par, v = 0.1),
-                  est.eqn.vic(slver$par, v = 0.5), est.eqn.vic(slver$par, v = 1))
+    vic.eqns <- c(est.eqn.vic(slver$par, nn.val = nn, v = -1),
+                  est.eqn.vic(slver$par, nn.val = nn, v = -0.5),
+                  est.eqn.vic(slver$par, nn.val = nn, v = 0.1),
+                  est.eqn.vic(slver$par, nn.val = nn, v = 0.5),
+                  est.eqn.vic(slver$par, nn.val = nn, v = 1))
 
     vic.eqn <- mean(vic.eqns)
 

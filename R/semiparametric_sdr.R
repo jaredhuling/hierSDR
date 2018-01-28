@@ -148,7 +148,14 @@ semi.phd2 <- function(x, y, d = 5L, maxit = 10L, h = NULL)
 
 
 
-semi.phd <- function(x, y, d = 5L, maxit = 10L, h = NULL, vic = FALSE, B = NULL, ...)
+semi.phd <- function(x, y, d = 5L, maxit = 10L, h = NULL,
+                     opt.method = c("lbfgs.x", "bfgs", "lbfgs2",
+                                    "bfgs.x",
+                                    "lbfgs",
+                                    "spg", "ucminf"),
+                     nn = NULL,
+                     optimize.nn = FALSE, verbose = TRUE,
+                     vic = FALSE, B = NULL, ...)
 {
     cov <- cov(x)
     eig.cov <- eigen(cov)
@@ -172,19 +179,36 @@ semi.phd <- function(x, y, d = 5L, maxit = 10L, h = NULL, vic = FALSE, B = NULL,
     gcv.vals   <- sapply(h, function(hv) gcv(x = directions, y = y, alpha = hv, deg = 3, ...)[4])
     best.h.init     <- h[which.min(gcv.vals)]
 
-    est.eqn <- function(beta.vec)
+    est.eqn <- function(beta.vec, nn.val, optimize.nn = FALSE)
     {
         #beta.mat   <- rbind(beta.init[1:d,], matrix(beta.vec, ncol = d))
-        beta.mat   <- rbind(diag(d), matrix(beta.vec, ncol = d))
+
+        if (optimize.nn)
+        {
+            beta.mat   <- rbind(diag(d), matrix(beta.vec[-1], ncol = d))
+        } else
+        {
+            beta.mat   <- rbind(diag(d), matrix(beta.vec, ncol = d))
+        }
+
         directions <- x.tilde %*% beta.mat
         #gcv.vals   <- sapply(h, function(hv) gcv(x = directions, y = y, alpha = hv, deg = 3, ...)[4])
         best.h     <- best.h.init # h[which.min(gcv.vals)]
         sd <- sd(directions)
 
-        best.h <- sd * (0.75 * nrow(directions)) ^ (-1/(ncol(directions)+4) )
-        locfit.mod <- locfit.raw(x = directions, y = y,
-                                 kern = "trwt", kt = "prod",
-                                 alpha = c(0.75, best.h), deg = 2, ...)
+        best.h <- sd * (0.75 * nrow(directions)) ^ (-1 / (ncol(directions) + 4) )
+
+        if (optimize.nn)
+        {
+            locfit.mod <- locfit.raw(x = directions, y = y,
+                                     kern = "trwt", kt = "prod",
+                                     alpha = c(exp(beta.vec[1]) / (1 + exp(beta.vec[1])), best.h), deg = 2, ...)
+        } else
+        {
+            locfit.mod <- locfit.raw(x = directions, y = y,
+                                     kern = "trwt", kt = "prod",
+                                     alpha = c(nn.val, best.h), deg = 2, ...)
+        }
 
 
         Ey.given.xbeta <- fitted(locfit.mod)
@@ -195,14 +219,21 @@ semi.phd <- function(x, y, d = 5L, maxit = 10L, h = NULL, vic = FALSE, B = NULL,
     }
 
 
-    est.eqn.vic <- function(beta.vec)
+    est.eqn.vic <- function(beta.vec, nn.val)
     {
         #beta.mat   <- rbind(beta.init[1:d,], matrix(beta.vec, ncol = d))
         beta.mat   <- matrix(beta.vec, ncol = d + 1)
         directions <- x.tilde %*% beta.mat
         #gcv.vals   <- sapply(h, function(hv) gcv(x = directions, y = y, alpha = hv, deg = 3, ...)[4])
         best.h     <- best.h.init # h[which.min(gcv.vals)]
-        locfit.mod <- locfit.raw(x = directions, y = y, alpha = best.h, deg = 3, ...)
+
+        sd <- sd(directions)
+
+        best.h <- sd * (0.75 * nrow(directions)) ^ (-1 / (ncol(directions) + 4) )
+
+        locfit.mod <- locfit.raw(x = directions, y = y,
+                                 kern = "trwt", kt = "prod",
+                                 alpha = c(nn.val, best.h), deg = 2, ...)
 
 
         Ey.given.xbeta <- fitted(locfit.mod)
@@ -212,7 +243,7 @@ semi.phd <- function(x, y, d = 5L, maxit = 10L, h = NULL, vic = FALSE, B = NULL,
         lhs
     }
 
-    est.eqn.grad <- function(beta.vec)
+    est.eqn.grad.old <- function(beta.vec)
     {
         #beta.mat   <- rbind(beta.init[1:d,], matrix(beta.vec, ncol = d))
         beta.mat   <- rbind(diag(d), matrix(beta.vec, ncol = d))
@@ -233,6 +264,13 @@ semi.phd <- function(x, y, d = 5L, maxit = 10L, h = NULL, vic = FALSE, B = NULL,
         gradient <- 2 * t(psi %*% psi.grad)
         ## psi gradient is essentially just grad of one column repeated d times
         rep(drop(gradient), d)
+    }
+
+    est.eqn.grad <- function(beta.vec, nn.val, optimize.nn = FALSE)
+    {
+        grad.full     <- grad(est.eqn, beta.vec, method = "simple", nn.val = nn.val, optimize.nn = optimize.nn)
+        if (verbose) cat("grad norm: ", sqrt(sum(grad.full ^ 2)), "\n")
+        grad.full
     }
 
     est.eqn2 <- function(beta.mat)
@@ -280,11 +318,38 @@ semi.phd <- function(x, y, d = 5L, maxit = 10L, h = NULL, vic = FALSE, B = NULL,
 
     #slver <- list(par = beta, value = est.eqn(beta))
 
-    slver <-   optim(par     = beta.init[-(1:ncol(beta.init)),], # beta.init[(d+1):nrow(beta.init),],
-                      fn      = est.eqn,
-                      #gr      = est.eqn.grad,
-                      method  = "L-BFGS",
-                      control = list(maxit = maxit, factr = 1e-10))
+    #slver <-   optim(par     = beta.init[-(1:ncol(beta.init)),], # beta.init[(d+1):nrow(beta.init),],
+    #                  fn      = est.eqn,
+    #                  #gr      = est.eqn.grad,
+    #                  method  = "L-BFGS",
+    #                  control = list(maxit = maxit, factr = 1e-10))
+
+
+    init <- as.vector(beta.init[-(1:ncol(beta.init)),])
+
+    # test which nn values minimize the most effectively
+    if (is.null(nn))
+    {
+        nn <- try.nn(nn.vals      = c(0.1, 0.25, 0.5, 0.75, 0.9, 0.95),
+                     init         = init,
+                     est.eqn      = est.eqn,
+                     est.eqn.grad = est.eqn.grad,
+                     opt.method   = opt.method,
+                     optimize.nn  = optimize.nn,
+                     maxit        = 10L,
+                     verbose      = verbose)
+
+        if (verbose) print(paste("best nn:", nn))
+    }
+
+    slver <- opt.est.eqn(init         = init,
+                         est.eqn      = est.eqn,
+                         est.eqn.grad = est.eqn.grad,
+                         opt.method   = opt.method,
+                         nn           = nn,
+                         optimize.nn  = optimize.nn,
+                         maxit        = maxit,
+                         verbose      = verbose)
 
     #slver <-   tnewton(x0      = as.vector(beta.init), # beta.init[(d+1):nrow(beta.init),],
     #                     gr      = est.eqn.grad,
@@ -457,6 +522,7 @@ semi.phd <- function(x, y, d = 5L, maxit = 10L, h = NULL, vic = FALSE, B = NULL,
          final.model  = locfit.mod,
          all.gcvs     = gcv.vals,
          rsq          = rsq.mean,
+         nn           = nn,
          vic          = vic)
 }
 
