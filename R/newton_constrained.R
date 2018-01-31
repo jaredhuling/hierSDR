@@ -548,6 +548,7 @@ semi.phd.hier.newton <- function(x.list, y, d = rep(1L, 3L),
         lhs / sum(weights)
     }
 
+
     est.eqn.grad <- function(beta.vec, nn.val, optimize.nn = FALSE)
     {
         grad.full     <- grad(est.eqn, beta.vec, method = "simple", nn.val = nn.val, optimize.nn = optimize.nn)

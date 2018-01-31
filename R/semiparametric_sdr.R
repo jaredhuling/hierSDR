@@ -8,23 +8,15 @@ semiDR <- function(x, y, d = 5L, maxit = 10L)
 
 }
 
-createDiffEpa <- function(x, h = 1)
-{
-    diffs <- outer(x, x, FUN = "-") / h
-    diffs[abs(diffs) >= 1] <- 0
-    diffs <- as(diffs, "sparseMatrix")
-    diffs
-}
 
-nwsmooth <- function(x, y, h = 1)
+nwsmooth <- function(x, y, h = 1, max.points = 100)
 {
     nobs        <- NROW(x)
-    #diffmat    <- createDiffEpa(x, h = h)
-    dist.idx    <- fields.rdist.near(x, x, 1/h, max.points = nobs * 100)
-    dist.idx$ra <- dist.idx$ra / h
+    dist.idx    <- fields.rdist.near(x, x, h, max.points = nobs * max.points)
+    dist.idx$ra <- Kepanechnikov2(dist.idx$ra / h)
     diffmat     <- sparseMatrix(dist.idx$ind[,1], dist.idx$ind[,2],
                                 x = dist.idx$ra,  dims = dist.idx$da)
-    diffmat@x   <- Kepanechnikov2(diffmat@x) / h
+    #diffmat@x   <- Kepanechnikov2(diffmat@x)# / h
 
     RSS <- sum(((Diagonal(nobs) - diffmat) %*% y)^2)/nobs
     predicted.values <- Matrix::colSums(y * diffmat) / Matrix::colSums(diffmat)
@@ -34,11 +26,15 @@ nwsmooth <- function(x, y, h = 1)
     list(fitted = predicted.values, gcv = gcv)
 }
 
+
 nwsmoothcov <- function(x, y, h = 1)
 {
     nobs <- NROW(x)
-    diffmat   <- createDiffEpa(y, h = h)
-    diffmat@x <- Kepanechnikov2(diffmat@x) / h
+    dist.idx    <- fields.rdist.near(x, x, h, max.points = nobs * max.points)
+    dist.idx$ra <- Kepanechnikov2(dist.idx$ra / h)
+    diffmat     <- sparseMatrix(dist.idx$ind[,1], dist.idx$ind[,2],
+                                x = dist.idx$ra,  dims = dist.idx$da)
+
     txpy <- predicted.values <- vector(mode = "list", length = nobs)
     trS <- sum(diag(diffmat))
 
@@ -522,6 +518,277 @@ semi.phd <- function(x, y, d = 5L, maxit = 10L, h = NULL,
          final.model  = locfit.mod,
          all.gcvs     = gcv.vals,
          rsq          = rsq.mean,
+         nn           = nn,
+         vic          = vic)
+}
+
+
+
+semi.vhd <- function(x, y, d = 5L, maxit = 10L, h = NULL,
+                     opt.method = c("lbfgs.x", "bfgs", "lbfgs2",
+                                    "bfgs.x",
+                                    "lbfgs",
+                                    "spg", "ucminf"),
+                     nn = NULL,
+                     optimize.nn = FALSE, verbose = TRUE,
+                     vic = FALSE, B = NULL, ...)
+{
+    cov <- cov(x)
+    eig.cov <- eigen(cov)
+    nobs  <- nrow(x)
+    nvars <- ncol(x)
+    eigvals <- eig.cov$values
+    eigvals[eigvals <= 0] <- 1e-5
+
+    sqrt.inv.cov <- eig.cov$vectors %*% diag(1 / sqrt(eigvals)) %*% t(eig.cov$vectors)
+    x.tilde <- scale(x, scale = FALSE) %*% sqrt.inv.cov
+
+    V.hat <- crossprod(x.tilde, drop(scale(y, scale = FALSE)) * x.tilde) / nrow(x.tilde)
+    eig.V <- eigen(V.hat)
+    beta.init  <- eig.V$vectors[,1:d,drop=FALSE]
+
+    if (is.null(h))
+    {
+        h <- exp(seq(log(0.1), log(25), length.out = 25))
+    }
+    directions <- x.tilde %*% beta.init
+    gcv.vals   <- sapply(h, function(hv) gcv(x = directions, y = y, alpha = hv, deg = 3, ...)[4])
+    best.h.init     <- h[which.min(gcv.vals)]
+
+    xv <- apply(x.tilde, 1, function(rr) sum(tcrossprod(rr)))
+    xv <- rowSums(x.tilde ^ 2)
+
+    est.eqn <- function(beta.vec, nn.val, optimize.nn = FALSE)
+    {
+        #beta.mat   <- rbind(beta.init[1:d,], matrix(beta.vec, ncol = d))
+
+        if (optimize.nn)
+        {
+            beta.mat   <- rbind(diag(d), matrix(beta.vec[-1], ncol = d))
+        } else
+        {
+            beta.mat   <- rbind(diag(d), matrix(beta.vec, ncol = d))
+        }
+
+        directions <- x.tilde %*% beta.mat
+
+        #gcv.vals   <- sapply(h, function(hv) gcv(x = directions, y = y, alpha = hv, deg = 3, ...)[4])
+        best.h     <- best.h.init # h[which.min(gcv.vals)]
+        sdd <- sd(directions)
+
+        best.h <- sdd * (0.75 * nrow(directions)) ^ (-1 / (ncol(directions) + 4) )
+
+        if (optimize.nn)
+        {
+            locfit.mod <- locfit.raw(x = directions, y = y,
+                                     kern = "trwt", kt = "prod",
+                                     alpha = c(exp(beta.vec[1]) / (1 + exp(beta.vec[1])), best.h), deg = 2, ...)
+        } else
+        {
+            locfit.mod <- locfit.raw(x = directions, y = y,
+                                     kern = "trwt", kt = "prod",
+                                     alpha = c(nn.val, best.h), deg = 2, ...)
+        }
+
+        xv.mod <- locfit.raw(x = directions, y = xv,
+                             kern = "trwt", kt = "prod",
+                             alpha = c(0.1, best.h), deg = 2, ...)
+
+        Ey.given.xbeta <- fitted(locfit.mod)
+
+        xv.resid <- drop(xv - fitted(xv.mod))
+
+        resid <- drop(y - Ey.given.xbeta)
+        lhs   <- sum((resid * xv.resid) ^ 2) / (nobs ^ 2)
+        lhs
+    }
+
+
+    est.eqn <- function(beta.vec, nn.val, optimize.nn = FALSE)
+    {
+        #beta.mat   <- rbind(beta.init[1:d,], matrix(beta.vec, ncol = d))
+
+        if (optimize.nn)
+        {
+            beta.mat   <- rbind(diag(d), matrix(beta.vec[-1], ncol = d))
+        } else
+        {
+            beta.mat   <- rbind(diag(d), matrix(beta.vec, ncol = d))
+        }
+
+        directions <- x.tilde %*% beta.mat
+
+        #gcv.vals   <- sapply(h, function(hv) gcv(x = directions, y = y, alpha = hv, deg = 3, ...)[4])
+        best.h     <- best.h.init # h[which.min(gcv.vals)]
+        sdd <- sd(directions)
+
+        best.h <- sdd * (0.75 * nrow(directions)) ^ (-1 / (ncol(directions) + 4) )
+
+        if (optimize.nn)
+        {
+            locfit.mod <- locfit.raw(x = directions, y = y,
+                                     kern = "trwt", kt = "prod",
+                                     alpha = c(exp(beta.vec[1]) / (1 + exp(beta.vec[1])), best.h), deg = 2, ...)
+        } else
+        {
+            locfit.mod <- locfit.raw(x = directions, y = y,
+                                     kern = "trwt", kt = "prod",
+                                     alpha = c(nn.val, best.h), deg = 2, ...)
+        }
+
+        xv.resid <- matrix(0, nrow = nobs, ncol = ncol(x.tilde))
+
+        for (j in 1:ncol(x.tilde))
+        {
+            xv.mod <- locfit.raw(x = directions, y = x.tilde[,j],
+                                 kern = "trwt", kt = "prod",
+                                 alpha = c(0.1, best.h), deg = 2, ...)
+            xv.resid[,j] <- drop(x.tilde[,j] - fitted(xv.mod))
+        }
+        Ey.given.xbeta <- fitted(locfit.mod)
+
+        resid <- drop(y - Ey.given.xbeta)
+        lhs   <- sum((resid * xv.resid) ^ 2) / (nobs ^ 2)
+        lhs
+    }
+
+    est.eqn.vic <- function(beta.vec, nn.val)
+    {
+        #beta.mat   <- rbind(beta.init[1:d,], matrix(beta.vec, ncol = d))
+        beta.mat   <- matrix(beta.vec, ncol = d + 1)
+        directions <- x.tilde %*% beta.mat
+        #gcv.vals   <- sapply(h, function(hv) gcv(x = directions, y = y, alpha = hv, deg = 3, ...)[4])
+        best.h     <- best.h.init # h[which.min(gcv.vals)]
+
+        sd <- sd(directions)
+
+        best.h <- sd * (0.75 * nrow(directions)) ^ (-1 / (ncol(directions) + 4) )
+
+        locfit.mod <- locfit.raw(x = directions, y = y,
+                                 kern = "trwt", kt = "prod",
+                                 alpha = c(nn.val, best.h), deg = 2, ...)
+
+
+        Ey.given.xbeta <- fitted(locfit.mod)
+
+        resid <- drop(y - Ey.given.xbeta)
+        lhs   <- norm(crossprod(x.tilde, resid * x.tilde), type = "F") ^ 2 / (nobs ^ 2)
+        lhs
+    }
+
+    est.eqn.grad <- function(beta.vec, nn.val, optimize.nn = FALSE)
+    {
+        grad.full     <- grad(est.eqn, beta.vec, method = "simple", nn.val = nn.val, optimize.nn = optimize.nn)
+        if (verbose) cat("grad norm: ", sqrt(sum(grad.full ^ 2)), "\n")
+        grad.full
+    }
+
+
+    #  beta[(d+1):nrow(beta),]
+
+    init <- rep(1, length(as.vector(beta.init[(d+1):nrow(beta.init),])) )
+
+    init <- as.vector(beta.init[-(1:ncol(beta.init)),])
+
+
+    # test which nn values minimize the most effectively
+    if (is.null(nn))
+    {
+        nn <- try.nn(nn.vals      = c(0.1, 0.25, 0.5, 0.75, 0.9, 0.95),
+                     init         = init,
+                     est.eqn      = est.eqn,
+                     est.eqn.grad = est.eqn.grad,
+                     opt.method   = opt.method,
+                     optimize.nn  = optimize.nn,
+                     maxit        = 10L,
+                     verbose      = verbose)
+
+        if (verbose) print(paste("best nn:", nn))
+    }
+
+    slver <- opt.est.eqn(init         = init,
+                         est.eqn      = est.eqn,
+                         est.eqn.grad = est.eqn.grad,
+                         opt.method   = opt.method,
+                         nn           = nn,
+                         optimize.nn  = optimize.nn,
+                         maxit        = maxit,
+                         verbose      = verbose)
+
+
+
+    #beta <- beta.init[(d+1):nrow(beta.init),]
+    beta <- beta.init
+    for (i in 1:maxit)
+    {
+
+    }
+
+    #beta.semi <- rbind(beta.init[1:d, ], matrix(slver$par, ncol = d))
+    beta.semi <- rbind(diag(d), matrix(slver$par, ncol = d))
+
+
+    if (vic)
+    {
+        beta.u <- beta.semi[1,,drop=FALSE]
+
+        if (TRUE)
+        {
+            v.1 <- matrix(rep(1, nrow(beta.semi) - 1), ncol=1)
+            vk.1 <- matrix(0, ncol=ncol(beta.semi)+1, nrow=nrow(beta.semi))
+            vk.1[-1,-ncol(vk.1)] <- vk.1[-1,-ncol(vk.1)] - drop(v.1 %*% beta.u)
+            vk.1[-1,ncol(vk.1)] <- v.1
+            vk.1[1,] <- c(rep(0, ncol(vk.1) - 1), 1)
+            vk.1.vec <- as.vector(vk.1)
+
+
+            v.2 <- matrix(rep(0, nrow(beta.semi) - 1), ncol=1)
+            vk.2 <- matrix(0, ncol=ncol(beta.semi)+1, nrow=nrow(beta.semi))
+            vk.2[-1,-ncol(vk.2)] <- vk.2[-1,-ncol(vk.2)] - drop(v.2 %*% beta.u)
+            vk.2[-1,ncol(vk.2)] <- v.2
+            vk.2[1,] <- c(rep(0, ncol(vk.2) - 1), 1)
+            vk.2.vec <- as.vector(vk.2)
+
+
+            v.3 <- matrix(rep(-1, nrow(beta.semi) - 1), ncol=1)
+            vk.3 <- matrix(0, ncol=ncol(beta.semi)+1, nrow=nrow(beta.semi))
+            vk.3[-1,-ncol(vk.3)] <- vk.2[-1,-ncol(v.3)] - drop(v.3 %*% beta.u)
+            vk.3[-1,ncol(vk.3)] <- v.3
+            vk.3[1,] <- c(rep(0, ncol(vk.3) - 1), 1)
+            vk.3.vec <- as.vector(vk.3)
+
+
+            eqn.val.1 <- est.eqn.vic(vk.1.vec) * nobs
+            eqn.val.2 <- est.eqn.vic(vk.2.vec) * nobs
+            eqn.val.3 <- est.eqn.vic(vk.3.vec) * nobs
+
+            vic <- (eqn.val.1 + eqn.val.2 + eqn.val.3) / 3 + nvars * d * log(nobs)
+        } else
+        {
+            vic <- slver$value * nobs + nvars * d * log(nobs)
+        }
+    } else
+    {
+        vic <- NULL
+    }
+
+
+
+    #beta.semi <- t(t(beta.semi) %*% sqrt.inv.cov)
+    beta      <- t(t(beta.init) %*% sqrt.inv.cov)
+
+
+
+
+    directions <- x %*% beta.semi
+
+    list(beta         = beta.semi,
+         beta.init    = beta,
+         directions   = directions,
+         solver.obj   = slver,
+         cov          = cov,
+         sqrt.inv.cov = sqrt.inv.cov,
+         all.gcvs     = gcv.vals,
          nn           = nn,
          vic          = vic)
 }
