@@ -305,7 +305,7 @@ semi.phd.hier.newton <- function(x.list, y, d = rep(1L, 3L),
                                                 "lbfgs",
                                                 "spg", "ucminf"),
                                  init.method = c("phd", "random"),
-                                 optimize.nn = TRUE,
+                                 optimize.nn = FALSE,
                                  nn = NULL, calc.mse = FALSE,
                                  verbose = TRUE, ...)
 {
@@ -770,7 +770,7 @@ hier.s.phd <- function(x, y, z, z.combinations, d,
                                       "spg", "ucminf"),
                        init.method = c("phd", "random"),
                        nn = NULL,
-                       optimize.nn = TRUE,
+                       optimize.nn = FALSE,
                        calc.mse = FALSE,
                        constrain.none.subpop = FALSE,
                        verbose = TRUE, ...)
@@ -780,6 +780,7 @@ hier.s.phd <- function(x, y, z, z.combinations, d,
 
     if (nobs != NROW(z)) stop("number of observations in x doesn't match number of observations in z")
 
+    z.combinations <- data.matrix(z.combinations)
     combinations   <- apply(z.combinations, 1, function(rr) paste(rr, collapse = ","))
     n.combinations <- length(combinations)
 
@@ -1101,7 +1102,7 @@ hier.s.phd <- function(x, y, z, z.combinations, d,
         }
     })
 
-    init <- unlist(beta.list.init)
+    init <- unlist(beta.component.init)
 
     # test which nn values minimize the most effectively
     if (is.null(nn))

@@ -27,34 +27,75 @@ nwsmooth <- function(x, y, h = 1, max.points = 100)
 }
 
 
-nwsmoothcov <- function(x, y, h = 1)
+nwsmoothcov <- function(directions, x, h = 1, max.points = 100, ret.xtx = FALSE)
 {
-    nobs <- NROW(x)
-    dist.idx    <- fields.rdist.near(x, x, h, max.points = nobs * max.points)
+    nobs <- NROW(directions)
+    dist.idx    <- fields.rdist.near(directions, directions, h,
+                                     max.points = nobs * max.points)
     dist.idx$ra <- Kepanechnikov2(dist.idx$ra / h)
     diffmat     <- sparseMatrix(dist.idx$ind[,1], dist.idx$ind[,2],
                                 x = dist.idx$ra,  dims = dist.idx$da)
 
     txpy <- predicted.values <- vector(mode = "list", length = nobs)
-    trS <- sum(diag(diffmat))
+    trS <- sum(Matrix::diag(diffmat))
 
-    csums <- colSums(diffmat)
+    csums <- Matrix::colSums(diffmat)
     for (i in 1:nobs) txpy[[i]] <- tcrossprod(x[i,])
     for (i in 1:nobs)
     {
-        sum.cov <- txpy[[1]] * diffmat[1,i]
-        for (j in 2:nobs) sum.cov <- sum.cov + txpy[[j]] * diffmat[j,i]
+        sum.cov <- txpy[[1]] * as.numeric(diffmat[1,i])
+        for (j in 2:nobs) sum.cov <- sum.cov + txpy[[j]] * as.numeric(diffmat[j,i])
 
-        predicted.values[[i]] <- sum.cov / csums[i]
+        predicted.values[[i]] <- as.matrix(sum.cov / csums[i])
     }
 
     normdiff <- 0
-    for (j in 1:nobs) normdiff <- normdiff + norm(txpy[[j]] - predicted.values[[j]], type = "F")
+    diff.cov <- vector(mode = "list", length = length(predicted.values))
+    for (j in 1:nobs)
+    {
+        diff.cov[[j]] <- txpy[[j]] - predicted.values[[j]]
+        normdiff <- normdiff + norm(diff.cov[[j]], type = "F")^2
+    }
 
-    gcv <- (1 / nobs) * ((normdiff / (1 - trS / nobs)) ^ 2)
+    gcv <- (1 / nobs) * ((sqrt(normdiff) / (1 - trS / nobs)) ^ 2)
 
-    list(fitted = predicted.values, gcv = gcv)
+    if (!ret.xtx) txpy <- NULL
+
+    list(fitted = predicted.values,
+         resid  = diff.cov,
+         gcv = gcv, xtx.list = txpy)
 }
+
+nwcov <- function(directions, x, txpy.list, h = 1, max.points = 100, ret.xtx = FALSE, ncuts = 3)
+{
+    nobs <- NROW(directions)
+    diff.cov <- vector(mode = "list", length = nobs)
+
+
+    pr.vals <- seq(0, 1, length.out = 3 + ncuts)
+    pr.vals <- pr.vals[-c(1, length(pr.vals))]
+    cuts <- apply(apply(directions, 2, function(x)
+        cut(x, breaks = c(min(x) - 0.001, quantile(x, probs = pr.vals), max(x) + 0.001 )  )), 1,
+        function(r) paste(r, collapse = "|"))
+
+    unique.cuts <- unique(cuts)
+
+    for (i in 1:length(unique.cuts))
+    {
+        in.idx <- which(cuts == unique.cuts[i])
+        n.curr <- length(in.idx)
+        mean.cov <- crossprod(x[in.idx,,drop=FALSE]) / n.curr
+        for (j in in.idx)
+        {
+            diff.cov[[j]] <- txpy.list[[j]] - mean.cov
+        }
+    }
+
+
+    list(resid  = diff.cov)
+}
+
+
 
 directional.regression <- function(x, y, d = 5L)
 {
@@ -531,6 +572,7 @@ semi.vhd <- function(x, y, d = 5L, maxit = 10L, h = NULL,
                                     "spg", "ucminf"),
                      nn = NULL,
                      optimize.nn = FALSE, verbose = TRUE,
+                     ncuts = 3,
                      vic = FALSE, B = NULL, ...)
 {
     cov <- cov(x)
@@ -557,6 +599,9 @@ semi.vhd <- function(x, y, d = 5L, maxit = 10L, h = NULL,
 
     xv <- apply(x.tilde, 1, function(rr) sum(tcrossprod(rr)))
     xv <- rowSums(x.tilde ^ 2)
+
+    txpy.list <- vector(mode = "list", length = NROW(x.tilde))
+    for (j in 1:NROW(x.tilde)) txpy.list[[j]] <- tcrossprod(x.tilde[j,])
 
     est.eqn <- function(beta.vec, nn.val, optimize.nn = FALSE)
     {
@@ -590,21 +635,32 @@ semi.vhd <- function(x, y, d = 5L, maxit = 10L, h = NULL,
                                      alpha = c(nn.val, best.h), deg = 2, ...)
         }
 
-        xv.mod <- locfit.raw(x = directions, y = xv,
-                             kern = "trwt", kt = "prod",
-                             alpha = c(0.1, best.h), deg = 2, ...)
+        #xv.mod <- locfit.raw(x = directions, y = xv,
+        #                     kern = "trwt", kt = "prod",
+        #                     alpha = c(0.1, best.h), deg = 2, ...)
+
+        #nws <- nwsmoothcov(directions, x = x.tilde, h = 0.25, max.points = 500)
+        nws <- nwcov(directions, x = x.tilde, txpy.list = txpy.list, h = 0.25, max.points = 500, ncuts = ncuts)
 
         Ey.given.xbeta <- fitted(locfit.mod)
 
-        xv.resid <- drop(xv - fitted(xv.mod))
+        #xv.resid <- drop(xv - fitted(xv.mod))
 
         resid <- drop(y - Ey.given.xbeta)
-        lhs   <- sum((resid * xv.resid) ^ 2) / (nobs ^ 2)
-        lhs
+        #lhs   <- sum((resid * xv.resid) ^ 2) / (nobs ^ 2)
+
+        lhs <- 0
+        for (i in 1:length(resid))
+        {
+            lhs <- lhs + sum((nws$resid[[i]] * resid[i]) ^ 2)
+        }
+
+        #lhs   <- norm(crossprod(x.tilde, resid * x.tilde), type = "F") ^ 2 / (nobs ^ 2)
+        lhs / nobs ^ 2
     }
 
 
-    est.eqn <- function(beta.vec, nn.val, optimize.nn = FALSE)
+    est.eqn2 <- function(beta.vec, nn.val, optimize.nn = FALSE)
     {
         #beta.mat   <- rbind(beta.init[1:d,], matrix(beta.vec, ncol = d))
 
@@ -690,6 +746,7 @@ semi.vhd <- function(x, y, d = 5L, maxit = 10L, h = NULL,
 
     init <- as.vector(beta.init[-(1:ncol(beta.init)),])
 
+    initval <- est.eqn(init, nn.val = 0.5)
 
     # test which nn values minimize the most effectively
     if (is.null(nn))
@@ -2300,27 +2357,38 @@ sir <- function(x, y, h = 10L, d = 5L, slice.ind = NULL)
     list(beta.hat = beta.hat, eta.hat = eta.hat, eigenvalues = eig.V$values)
 }
 
+Proj <- function(b) b %*% solve(crossprod(b), t(b))
 
+proj.norm <- function(b1, b2)
+{
+    norm(Proj(b1) - Proj(b2), type = "F")
+}
 
 # from http://www4.stat.ncsu.edu/~li/software/GroupDR.R
 # angle between two spaces
-angles<-function(B1, B2)
+angles <- function(B1, B2)
 {
     if(!is.matrix(B1)) B1 <- as.matrix(B1)
     if(!is.matrix(B2)) B2 <- as.matrix(B2)
 
-    if(ncol(B1) >= ncol(B2)) {
-        B <- B1; B.hat <- B2
-    } else {
-        B <- B2; B.hat <- B1
+    if(ncol(B1) >= ncol(B2))
+    {
+        B     <- B1
+        B.hat <- B2
+    } else
+    {
+        B     <- B2
+        B.hat <- B1
     }
 
     P1 <- B %*% solve(crossprod(B), t(B))
-    if(ncol(B.hat) == 1) {
+    if(ncol(B.hat) == 1)
+    {
         nume  <- as.vector(t(B.hat) %*% P1 %*% B.hat)
         deno  <- as.vector(t(B.hat) %*% B.hat)
         ratio <- nume / deno
-    } else {
+    } else
+    {
         BtB   <- t(B.hat) %*% B.hat
         ei    <- eigen(BtB)
         BtB2  <- ei$vectors %*% diag(1/sqrt(ei$values)) %*% t(ei$vectors)
@@ -2337,34 +2405,69 @@ angles<-function(B1, B2)
 # normalize a vector
 norm2 <- function(v)
 {
-    sumv2<-sum(v^2)
-    if(sumv2 == 0) sumv2<-1
-    v/sqrt(sumv2)
+    sumv2 <- sum(v ^ 2)
+    if(sumv2 == 0) sumv2 <- 1
+    v / sqrt(sumv2)
 }
 
-# Gram-Schmidt orthonormalization
-orthnorm<-function(X)
-{
-    X<-as.matrix(X)
-    n<-nrow(X)
-    p<-ncol(X)
 
-    W<-NULL
-    if(p > 1) {
-        W<-cbind(W, X[,1])
-        for(k in 2:p) {
-            gw<-rep(0, n)
-            for(i in 1:(k-1)) {
-                gki<-as.vector((t(W[,i]) %*% X[,k])/(t(W[,i]) %*% W[,i]))
-                gw<-gw + gki * W[,i]
-            }
-            W<-cbind(W, X[,k] - gw)
-        }
-    } else {
-        W<-cbind(W, X[,1])
+random.colspace <- function(beta, orthog = FALSE, min = 0)
+{
+    beta <- as.matrix(beta)
+
+    p <- nrow(beta)
+    d <- ncol(beta)
+
+    M <- matrix(runif(p ^ 2, min = min), ncol = p)
+    M <- 2 * matrix(rbinom(p ^ 2, 1, 0.5), ncol = p) - 1
+
+    if (orthog)
+    {
+        sv <- svd(M)
+        M  <- tcrossprod(sv$u, sv$v)
     }
 
-    W<-apply(W, 2, norm)
+    # if (ncol(beta) < ncol(M))
+    # {
+    #     ncm <- ncol(M) - d
+    #     beta <- cbind(beta, matrix(0, nrow = p, ncol = ncm))
+    #     newbeta <- M %*% beta %*% t(M)
+    #     beta <- newbeta[,1:d,drop=FALSE]
+    # }
+
+    list(beta = M %*% beta, mat = M)
+}
+
+
+
+
+# Gram-Schmidt orthonormalization
+orthnorm <- function(X)
+{
+    X <- as.matrix(X)
+    n <- nrow(X)
+    p <- ncol(X)
+
+    W <- NULL
+    if(p > 1)
+    {
+        W <- cbind(W, X[,1])
+        for(k in 2:p)
+        {
+            gw <- rep(0, n)
+            for(i in 1:(k-1))
+            {
+                gki <- as.vector((t(W[,i]) %*% X[,k]) / (t(W[,i]) %*% W[,i]))
+                gw  <- gw + gki * W[,i]
+            }
+            W <- cbind(W, X[,k] - gw)
+        }
+    } else
+    {
+        W <- cbind(W, X[,1])
+    }
+
+    W <- apply(W, 2, norm)
     W
 }
 
