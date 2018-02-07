@@ -206,20 +206,30 @@ vec2subpopMatsIdVIC <- function(vec, p, d, cond.mat, incl.none = FALSE, v = 1)
         }
     }
 
+    change.idx <- unname(which.min(rowSums(cond.mat)))
+
+    beta.orig <- component.list[[change.idx]][-(1:ncol(component.list[[change.idx]])),,drop = FALSE]
+    beta.U    <- beta.orig[1,,drop = FALSE]
+    beta.L    <- beta.orig[-1,,drop = FALSE]
+    V         <- matrix(v,  nrow = nrow(beta.L), ncol = 1)
+    beta.new  <- cbind(beta.L - V %*% beta.U, V)
+    component.list[[change.idx]] <- rbind(diag(ncol(beta.orig) + 1),
+                                    beta.new)
+
     for (s in 1:n.subpops)
     {
         mat.list[[s]] <- do.call(cbind, component.list[createBelowList[[s]]])
     }
 
-    change.idx <- unname(which.min(rowSums(cond.mat)))
-
-    beta.orig <- mat.list[[change.idx]][-(1:ncol(mat.list[[change.idx]])),,drop = FALSE]
-    beta.U    <- beta.orig[1,,drop = FALSE]
-    beta.L    <- beta.orig[-1,,drop = FALSE]
-    V         <- matrix(v,  nrow = nrow(beta.L), ncol = 1)
-    beta.new  <- cbind(beta.L - V %*% beta.U, V)
-    mat.list[[change.idx]] <- rbind(diag(ncol(beta.orig) + 1),
-                                 beta.new)
+    # change.idx <- unname(which.min(rowSums(cond.mat)))
+    #
+    # beta.orig <- mat.list[[change.idx]][-(1:ncol(mat.list[[change.idx]])),,drop = FALSE]
+    # beta.U    <- beta.orig[1,,drop = FALSE]
+    # beta.L    <- beta.orig[-1,,drop = FALSE]
+    # V         <- matrix(v,  nrow = nrow(beta.L), ncol = 1)
+    # beta.new  <- cbind(beta.L - V %*% beta.U, V)
+    # mat.list[[change.idx]] <- rbind(diag(ncol(beta.orig) + 1),
+    #                              beta.new)
 
     mat.list
 }
@@ -369,94 +379,10 @@ semi.phd.hier.newton <- function(x.list, y, d = rep(1L, 3L),
 
     strat.id <- unlist(lapply(1:length(x.list), function(id) rep(id, nrow(x.list[[id]]))))
 
-
-
-
-    beta.list <- beta.init.list <- Proj.constr.list <- vector(mode = "list", length = length(constraints))
-
-    if (init.method == "phd")
-    {
-        V.hat <- crossprod(x.tilde.b, drop(scale(y, scale = FALSE)) * x.tilde.b) / nrow(x.tilde.b)
-        for (c in 1:length(constraints))
-        {
-            #print(d)
-            if (d[c] > 0)
-            {
-                Pc <- constraints[[c]] %*% solve(crossprod(constraints[[c]]), t(constraints[[c]]))
-
-                Proj.constr.list[[c]] <- diag(ncol(Pc)) - Pc
-
-                eig.c <- eigen(Proj.constr.list[[c]] %*% V.hat )
-                eta.hat <- eig.c$vectors[,1:d[c], drop=FALSE]
-                beta.list[[c]] <- Re(eta.hat)
-            }
-        }
-
-        Proj.constr.list <- Proj.constr.list[!sapply(Proj.constr.list, is.null)]
-
-        #eig.V <- eigen(V.hat)
-        beta.init  <- do.call(cbind, beta.list) #eig.V$vectors[,1:d,drop=FALSE]
-    } else
-    {
-        for (c in 1:length(constraints))
-        {
-            #print(d)
-            if (d[c] > 0)
-            {
-                Pc <- constraints[[c]] %*% solve(crossprod(constraints[[c]]), t(constraints[[c]]))
-
-                Proj.constr.list[[c]] <- diag(ncol(Pc)) - Pc
-
-                beta.list[[c]] <- Proj.constr.list[[c]] %*%
-                    matrix(runif(prod(dim(eta.hat)),
-                                 min = min(beta.list[[c]]),
-                                 max = max(beta.list[[c]])),
-                           ncol = NCOL(eta.hat))
-            }
-        }
-
-        Proj.constr.list <- Proj.constr.list[!sapply(Proj.constr.list, is.null)]
-        beta.init <- do.call(cbind, beta.list)
-    }
-
-
-
     unique.strata <- unique(strat.id)
     num.strata    <- length(unique.strata)
 
-    beta.list.init <- beta.list
 
-    for (s in 1:length(beta.list.init))
-    {
-        beta.list.init[[s]] <- beta.list.init[[s]][(p * (s - 1) + 1):(p * s),,drop=FALSE]
-    }
-
-
-
-    #######    model fitting to determine bandwidth     ########
-
-    best.h.vec <- numeric(num.strata)
-
-    if (is.null(h))
-    {
-        h <- exp(seq(log(0.1), log(25), length.out = 25))
-    }
-
-    beta.init.cov <- t(t(beta.init) %*% sqrt.inv.cov.b)
-    for (s in 1:num.strata)
-    {
-        strata.idx <- which(strat.id == unique.strata[s])
-        dir.cur    <- x.tilde.b[strata.idx, ((s - 1) * pp + 1):(s * pp)] %*%
-            beta.init[((s - 1) * pp + 1):(s * pp),,drop=FALSE]
-        #print(apply(dir.cur, 2, sd))
-        dir.cur    <- dir.cur[,which(apply(dir.cur, 2, sd) != 0)]
-
-        gcv.vals   <- sapply(h, function(hv) gcv(x = dir.cur,
-                                                 y = y[strata.idx],
-                                                 kern = "trwt", kt = "prod",
-                                                 alpha = hv, deg = 3, ...)[4])
-        best.h.vec[s]     <- h[which.min(gcv.vals)]
-    }
 
     est.eqn <- function(beta.vec, nn.val, optimize.nn = FALSE)
     {
@@ -494,7 +420,7 @@ semi.phd.hier.newton <- function(x.list, y, d = rep(1L, 3L),
             #                                         y = y[strata.idx],
             #                                         kern = "gauss",
             #                                         alpha = hv, deg = 3, ...)[4])
-            best.h     <- best.h.vec[s] # h[which.min(gcv.vals)]
+            #best.h     <- best.h.vec[s] # h[which.min(gcv.vals)]
 
             sd <- sd(dir.cur)
 
@@ -514,7 +440,7 @@ semi.phd.hier.newton <- function(x.list, y, d = rep(1L, 3L),
 
 
 
-                                     #alpha = c(exp(beta.vec[1]) / (1 + exp(beta.vec[1])), best.h), deg = 2, ...)
+            #alpha = c(exp(beta.vec[1]) / (1 + exp(beta.vec[1])), best.h), deg = 2, ...)
 
             # locfit.mod <- locfit.raw(x = dir.cur, y = y[strata.idx],
             #                          kern = "trwt", kt = "prod",
@@ -547,6 +473,105 @@ semi.phd.hier.newton <- function(x.list, y, d = rep(1L, 3L),
         })))
         lhs / sum(weights)
     }
+
+
+
+    beta.list <- beta.init.list <- Proj.constr.list <- vector(mode = "list", length = length(constraints))
+
+    npar <- sum(p * d - d ^ 2)
+    V.hat <- crossprod(x.tilde.b, drop(scale(y, scale = FALSE)) * x.tilde.b) / nrow(x.tilde.b)
+    for (c in 1:length(constraints))
+    {
+        #print(d)
+        if (d[c] > 0)
+        {
+            Pc <- constraints[[c]] %*% solve(crossprod(constraints[[c]]), t(constraints[[c]]))
+
+            Proj.constr.list[[c]] <- diag(ncol(Pc)) - Pc
+
+            eig.c <- eigen(Proj.constr.list[[c]] %*% V.hat )
+            eta.hat <- eig.c$vectors[,1:d[c], drop=FALSE]
+            beta.list[[c]] <- Re(eta.hat)
+        }
+    }
+
+
+    beta.list.init <- beta.list
+
+    for (s in 1:length(beta.list.init))
+    {
+        beta.list.init[[s]] <- beta.list.init[[s]][(p * (s - 1) + 1):(p * s),,drop=FALSE]
+    }
+
+    beta.list.init <- lapply(beta.list.init, function(bb) {
+        nc <- ncol(bb)
+        bb[(nc + 1):nrow(bb),]
+    })
+
+    init <- unlist(beta.list.init)
+
+    Proj.constr.list <- Proj.constr.list[!sapply(Proj.constr.list, is.null)]
+
+    #eig.V <- eigen(V.hat)
+    beta.init  <- do.call(cbind, beta.list) #eig.V$vectors[,1:d,drop=FALSE]
+    if (init.method == "random")
+    {
+        n.samples <- 100
+        beta.list.phd <- beta.list.tmp <- beta.list
+        best.value <- 1e99
+
+        nn.vals <- c(0.15, 0.25, 0.5, 0.75, 0.9, 0.95)
+        for (tr in 1:n.samples)
+        {
+            par.cur <- runif(npar, min = min(init), max = max(init))
+
+            values.cur <- numeric(length(nn.vals))
+            for (i in 1:length(nn.vals) )
+            {
+                nh <- nn.vals[i]
+                values.cur[i] <- est.eqn(par.cur, nn.val = nh)
+            }
+
+            value.cur <- min(values.cur)
+            if (value.cur < best.value)
+            {
+                best.value <- value.cur
+                best.par   <- par.cur
+            }
+        }
+        init <- best.par
+    }
+
+
+
+
+
+
+    #######    model fitting to determine bandwidth     ########
+
+    best.h.vec <- numeric(num.strata)
+
+    if (is.null(h))
+    {
+        h <- exp(seq(log(0.1), log(25), length.out = 25))
+    }
+
+    beta.init.cov <- t(t(beta.init) %*% sqrt.inv.cov.b)
+    for (s in 1:num.strata)
+    {
+        strata.idx <- which(strat.id == unique.strata[s])
+        dir.cur    <- x.tilde.b[strata.idx, ((s - 1) * pp + 1):(s * pp)] %*%
+            beta.init[((s - 1) * pp + 1):(s * pp),,drop=FALSE]
+        #print(apply(dir.cur, 2, sd))
+        dir.cur    <- dir.cur[,which(apply(dir.cur, 2, sd) != 0)]
+
+        gcv.vals   <- sapply(h, function(hv) gcv(x = dir.cur,
+                                                 y = y[strata.idx],
+                                                 kern = "trwt", kt = "prod",
+                                                 alpha = hv, deg = 3, ...)[4])
+        best.h.vec[s]     <- h[which.min(gcv.vals)]
+    }
+
 
 
     est.eqn.grad <- function(beta.vec, nn.val, optimize.nn = FALSE)
@@ -634,16 +659,13 @@ semi.phd.hier.newton <- function(x.list, y, d = rep(1L, 3L),
 
 
 
-    beta.list.init <- lapply(beta.list.init, function(bb) {
-        nc <- ncol(bb)
-        bb[(nc + 1):nrow(bb),]
-    })
+
 
     # slver <- newton(par = unlist(beta.list.init), # subpopMats2vec(beta.list, d),
     #                 fn = est.eqn, maxit = maxit, tol = 1e-8,
     #                 verbose = verbose)
 
-    init <- unlist(beta.list.init)
+
 
     # test which nn values minimize the most effectively
     if (is.null(nn))
@@ -749,6 +771,7 @@ semi.phd.hier.newton <- function(x.list, y, d = rep(1L, 3L),
          #beta.rand.init = t(t(beta.rand.init) %*% sqrt.inv.cov),
          cov = cov, sqrt.inv.cov = sqrt.inv.cov,
          nn  = nn,
+         value = slver$value, value.init = est.eqn(init, nn.val = nn),
          vic.est.eqn = vic.eqn, vic.eqns = vic.eqns,
          vic = vic, vic2 = vic2,
          sse = sse.vec, mse = mse.vec)
@@ -764,8 +787,9 @@ hasAllConds <- function(checkvec, combvec)
 hier.s.phd <- function(x, y, z, z.combinations, d,
                        maxit = 250L, h = NULL, B = NULL, vic = FALSE,
                        weights = rep(1L, NROW(y)),
-                       opt.method = c("lbfgs.x", "bfgs", "lbfgs2",
+                       opt.method = c("lbfgs2", "lbfgs.x",
                                       "bfgs.x",
+                                      "bfgs",
                                       "lbfgs",
                                       "spg", "ucminf"),
                        init.method = c("phd", "random"),
@@ -1178,6 +1202,7 @@ hier.s.phd <- function(x, y, z, z.combinations, d,
          beta.init = beta.init,
          cov = cov, sqrt.inv.cov = sqrt.inv.cov,
          solver.obj = slver,
+         value = slver$value, value.init = est.eqn(init, nn.val = nn),
          vic.est.eqn = vic.eqn, vic.eqns = vic.eqns,
          vic = vic, vic2 = vic2, vic3 = vic3,
          sse = sse.vec, mse = mse.vec)

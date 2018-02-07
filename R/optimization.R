@@ -2,10 +2,13 @@
 
 
 opt.est.eqn <- function(init, est.eqn, est.eqn.grad,
-                        opt.method = c("lbfgs.x", "bfgs", "lbfgs2",
+                        opt.method = c("lbfgs2",
+                                       "ucminf",
+                                       "lbfgs.x",
                                        "bfgs.x",
+                                       "bfgs",
                                        "lbfgs",
-                                       "spg", "ucminf"),
+                                       "spg"),
                         nn = 0.75,
                         optimize.nn = FALSE, maxit = 100, verbose = FALSE)
 {
@@ -46,6 +49,7 @@ opt.est.eqn <- function(init, est.eqn, est.eqn.grad,
                          call_gra  = est.eqn.grad,
                          nn.val    = nn,
                          optimize.nn = optimize.nn,
+                         invisible = 1 * (!verbose),
                          max_iterations = maxit)
         if (optimize.nn) slver$par <- slver$par[-1]
     } else if (opt.method == "bfgs.x")
