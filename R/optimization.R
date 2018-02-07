@@ -2,12 +2,12 @@
 
 
 opt.est.eqn <- function(init, est.eqn, est.eqn.grad,
-                        opt.method = c("lbfgs2",
-                                       "ucminf",
-                                       "lbfgs.x",
+                        opt.method = c("lbfgs.x",
+                                       "lbfgs2",
                                        "bfgs.x",
                                        "bfgs",
                                        "lbfgs",
+                                       "ucminf",
                                        "spg"),
                         nn = 0.75,
                         optimize.nn = FALSE, maxit = 100, verbose = FALSE)

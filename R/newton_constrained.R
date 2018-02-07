@@ -153,6 +153,32 @@ vec2subpopMats <- function(vec, p, d, cond.mat, incl.none = FALSE)
     mat.list
 }
 
+
+vec2subpopMatsUnconstr <- function(vec, p, d, cond.mat, incl.none = FALSE)
+{
+    # d here needs to be the total ncols for each beta matrix
+    n.conditions    <- as.integer(log2(length(d) + !incl.none))
+    n.subpops       <- length(d)
+    #cond.mat       <- subpop.struct(n.conditions, incl.none)
+    mat.list        <- vector(mode = "list", length = n.subpops)
+    nnz             <- sum(d > 0)
+
+    createBelowList <- createBelowList(cond.mat)
+
+
+    cumul.params    <- c(0, cumsum(d * p))
+    for (s in 1:n.subpops)
+    {
+        if (d[s] > 0)
+        {
+            vec.idx <- (cumul.params[s] + 1):cumul.params[s + 1]
+            mat.list[[s]] <- matrix(vec[vec.idx], ncol = d[s])
+        }
+    }
+    mat.list
+}
+
+
 vec2subpopMatsId <- function(vec, p, d, cond.mat, incl.none = FALSE)
 {
     n.conditions    <- as.integer(log2(length(d) + !incl.none))
@@ -476,6 +502,8 @@ semi.phd.hier.newton <- function(x.list, y, d = rep(1L, 3L),
 
 
 
+
+
     beta.list <- beta.init.list <- Proj.constr.list <- vector(mode = "list", length = length(constraints))
 
     npar <- sum(p * d - d ^ 2)
@@ -508,12 +536,111 @@ semi.phd.hier.newton <- function(x.list, y, d = rep(1L, 3L),
         bb[(nc + 1):nrow(bb),]
     })
 
+
+
     init <- unlist(beta.list.init)
 
     Proj.constr.list <- Proj.constr.list[!sapply(Proj.constr.list, is.null)]
 
     #eig.V <- eigen(V.hat)
     beta.init  <- do.call(cbind, beta.list) #eig.V$vectors[,1:d,drop=FALSE]
+
+
+    d2 <- sapply(vec2subpopMatsId(init, p, d, cond.mat), ncol)
+
+    est.eqn.unconstr <- function(beta.vec, nn.val, optimize.nn = FALSE)
+    {
+        #beta.mat.list <- vector(mode = "list", length = 3L)
+
+        #beta.mat.list[[1]] <- matrix(beta.vec[(cum.d[1] * p + 1):(cum.d[2] * p)], ncol = d[1])
+        #beta.mat.list[[2]] <- matrix(beta.vec[(cum.d[2] * p + 1):(cum.d[3] * p)], ncol = d[2])
+        #beta.mat.list[[3]] <- matrix(beta.vec[(cum.d[3] * p + 1):length(beta.vec)], ncol = cum.d[4] )
+
+        cond.mat <- subpop.struct(2L)
+        if (optimize.nn)
+        {
+            beta.mat.list <- vec2subpopMatsUnconstr(beta.vec[-1], p, d2, cond.mat)
+        } else
+        {
+            beta.mat.list <- vec2subpopMatsUnconstr(beta.vec, p, d2, cond.mat)
+        }
+
+
+        #t(t(matrix(beta.vec, ncol = d * length(constraints))) %*% sqrt.inv.cov)
+
+
+        Ey.given.xbeta <- numeric(nobs)
+
+
+        for (s in 1:num.strata)
+        {
+            strata.idx <- which(strat.id == unique.strata[s])
+            dir.cur    <- x.tilde[[s]] %*% beta.mat.list[[s]]
+            #print(apply(dir.cur, 2, sd))
+            dir.cur    <- dir.cur[,which(apply(dir.cur, 2, sd) != 0),drop=FALSE]
+
+
+            #gcv.vals   <- sapply(h, function(hv) gcv(x = dir.cur,
+            #                                         y = y[strata.idx],
+            #                                         kern = "gauss",
+            #                                         alpha = hv, deg = 3, ...)[4])
+            #best.h     <- best.h.vec[s] # h[which.min(gcv.vals)]
+
+            sd <- sd(dir.cur)
+
+            best.h <- sd * (0.75 * nrow(dir.cur)) ^ (-1 / (ncol(dir.cur) + 4) )
+
+            if (optimize.nn)
+            {
+                locfit.mod <- locfit.raw(x = dir.cur, y = y[strata.idx],
+                                         kern = "trwt", kt = "prod",
+                                         alpha = c(exp(beta.vec[1]) / (1 + exp(beta.vec[1])), best.h), deg = 2, ...)
+            } else
+            {
+                locfit.mod <- locfit.raw(x = dir.cur, y = y[strata.idx],
+                                         kern = "trwt", kt = "prod",
+                                         alpha = c(nn.val, best.h), deg = 2, ...)
+            }
+
+
+
+            #alpha = c(exp(beta.vec[1]) / (1 + exp(beta.vec[1])), best.h), deg = 2, ...)
+
+            # locfit.mod <- locfit.raw(x = dir.cur, y = y[strata.idx],
+            #                          kern = "trwt", kt = "prod",
+            #                          alpha = best.h, deg = 2, ...)
+
+
+            # if (ncol(dir.cur) == 1)
+            # {
+            #     locfit.mod <- gam(y[strata.idx] ~ te(dir.cur),...)
+            # } else if (ncol(dir.cur) == 2)
+            # {
+            #     locfit.mod <- gam(y[strata.idx] ~ te(dir.cur[,1],dir.cur[,2]),...)
+            # } else if (ncol(dir.cur) == 3)
+            # {
+            #     locfit.mod <- gam(y[strata.idx] ~ te(dir.cur[,1], dir.cur[,2], dir.cur[,3]),...)
+            # } else if (ncol(dir.cur) == 4)
+            # {
+            #     locfit.mod <- gam(y[strata.idx] ~ te(dir.cur[,1], dir.cur[,2], dir.cur[,3], dir.cur[,4]),...)
+            # }
+            Ey.given.xbeta[strata.idx] <- fitted(locfit.mod)
+        }
+
+
+
+        lhs   <- sum(unlist(lapply(1:length(x.tilde), function(i) {
+            strata.idx <- which(strat.id == unique.strata[i])
+            resid <- drop(y[strata.idx] - Ey.given.xbeta[strata.idx])
+            wts.cur <- weights[strata.idx]
+            norm(crossprod(x.tilde[[i]], (wts.cur * resid) * x.tilde[[i]]), type = "F") ^ 2
+        })))
+        lhs / sum(weights)
+    }
+
+
+
+
     if (init.method == "random")
     {
         n.samples <- 100
@@ -577,6 +704,13 @@ semi.phd.hier.newton <- function(x.list, y, d = rep(1L, 3L),
     est.eqn.grad <- function(beta.vec, nn.val, optimize.nn = FALSE)
     {
         grad.full     <- grad(est.eqn, beta.vec, method = "simple", nn.val = nn.val, optimize.nn = optimize.nn)
+        if (verbose) cat("grad norm: ", sqrt(sum(grad.full ^ 2)), "\n")
+        grad.full
+    }
+
+    est.eqn.grad.unconstr <- function(beta.vec, nn.val, optimize.nn = FALSE)
+    {
+        grad.full     <- grad(est.eqn.unconstr, beta.vec, method = "simple", nn.val = nn.val, optimize.nn = optimize.nn)
         if (verbose) cat("grad norm: ", sqrt(sum(grad.full ^ 2)), "\n")
         grad.full
     }
@@ -702,6 +836,20 @@ semi.phd.hier.newton <- function(x.list, y, d = rep(1L, 3L),
 
     beta <- beta.init
 
+    cond.mat <- subpop.struct(2L)
+    #beta.mat.list <- vec2subpopMats(slver$par, p, d, cond.mat)
+    beta.mat.list <- vec2subpopMatsId(slver$par, p, d, cond.mat)
+
+    if (verbose) print("Unconstr opt")
+    slver.unconstr <- opt.est.eqn(init         = unlist(beta.mat.list),
+                                  est.eqn      = est.eqn.unconstr,
+                                  est.eqn.grad = est.eqn.unconstr.grad,
+                                  opt.method   = opt.method,
+                                  nn           = nn,
+                                  optimize.nn  = optimize.nn,
+                                  maxit        = 50,
+                                  verbose      = verbose)
+
     #beta.mat.list <- vector(mode = "list", length = 3L)
 
     #beta.mat.list[[1]] <- matrix(slver$par[(cum.d[1] * p + 1):(cum.d[2] * p)], ncol = d[1])
@@ -709,9 +857,7 @@ semi.phd.hier.newton <- function(x.list, y, d = rep(1L, 3L),
     #beta.mat.list[[3]] <- matrix(slver$par[(cum.d[3] * p + 1):length(slver$par)], ncol = cum.d[4] )
 
 
-    cond.mat <- subpop.struct(2L)
-    #beta.mat.list <- vec2subpopMats(slver$par, p, d, cond.mat)
-    beta.mat.list <- vec2subpopMatsId(slver$par, p, d, cond.mat)
+
 
     if (verbose) print("computing VIC's")
 
@@ -727,6 +873,7 @@ semi.phd.hier.newton <- function(x.list, y, d = rep(1L, 3L),
 
     vic  <- vic.eqn     + log(sum(nobs.vec)) * nvars * (sum(sapply(beta.mat.list, ncol)))
     vic2 <- slver$value + log(sum(nobs.vec)) * nvars * (sum(sapply(beta.mat.list, ncol)))
+    vic3 <- slver.unconstr$value + log(sum(nobs.vec)) * nvars * (sum(sapply(beta.mat.list, ncol)))
 
     model.list <- vector(mode = "list", length = 3)
 
@@ -772,8 +919,9 @@ semi.phd.hier.newton <- function(x.list, y, d = rep(1L, 3L),
          cov = cov, sqrt.inv.cov = sqrt.inv.cov,
          nn  = nn,
          value = slver$value, value.init = est.eqn(init, nn.val = nn),
+         value.unconstr = slver.unconstr$value,
          vic.est.eqn = vic.eqn, vic.eqns = vic.eqns,
-         vic = vic, vic2 = vic2,
+         vic = vic, vic2 = vic2, vic3 = vic3,
          sse = sse.vec, mse = mse.vec)
 }
 
