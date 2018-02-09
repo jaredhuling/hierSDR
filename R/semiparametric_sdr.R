@@ -367,7 +367,7 @@ semi.phd <- function(x, y, d = 5L, maxit = 10L, h = NULL,
     # test which nn values minimize the most effectively
     if (is.null(nn))
     {
-        nn <- try.nn(nn.vals      = c(0.1, 0.25, 0.5, 0.75, 0.9, 0.95),
+        tryval <- try.nn(nn.vals      = c(0.1, 0.25, 0.5, 0.75, 0.9, 0.95),
                      init         = init,
                      est.eqn      = est.eqn,
                      est.eqn.grad = est.eqn.grad,
@@ -375,6 +375,9 @@ semi.phd <- function(x, y, d = 5L, maxit = 10L, h = NULL,
                      optimize.nn  = optimize.nn,
                      maxit        = 10L,
                      verbose      = verbose)
+
+        nn   <- tryval$nn
+        init <- tryval$par
 
         if (verbose) print(paste("best nn:", nn))
     }

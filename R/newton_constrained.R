@@ -134,7 +134,7 @@ vec2subpopMats <- function(vec, p, d, cond.mat, incl.none = FALSE)
     nnz             <- sum(d > 0)
     component.list  <- vector(mode = "list", length = n.subpops)
 
-    createBelowList <- createBelowList(cond.mat)
+    BelowList <- createBelowList(cond.mat)
 
     cumul.params    <- c(0, cumsum(d * p))
     for (s in 1:n.subpops)
@@ -148,9 +148,66 @@ vec2subpopMats <- function(vec, p, d, cond.mat, incl.none = FALSE)
 
     for (s in 1:n.subpops)
     {
-        mat.list[[s]] <- do.call(cbind, component.list[createBelowList[[s]]])
+        mat.list[[s]] <- do.call(cbind, component.list[BelowList[[s]]])
     }
     mat.list
+}
+
+subpopMats2components <- function(mat.list, p, d, cond.mat, incl.none = FALSE)
+{
+    n.conditions    <- as.integer(log2(length(d) + !incl.none))
+    n.subpops       <- length(d)
+    nnz             <- sum(d > 0)
+    component.list  <- vector(mode = "list", length = n.subpops)
+
+    BelowList      <- createBelowList(cond.mat)
+
+    cumul.params    <- c(0, cumsum(d * p))
+    for (s in 1:n.subpops)
+    {
+        if (d[s] > 0)
+        {
+            vec.idx <- (cumul.params[s] + 1):cumul.params[s + 1]
+            component.list[[s]] <- matrix(vec[vec.idx], ncol = d[s])
+        }
+    }
+
+    BelowListCols <- lapply(BelowList, function(mt) {
+        vl <- NULL
+        for (i in 1:length(mt))
+        {
+            vl <- c(vl, rep(mt[i], d[mt[i]]))
+        }
+        vl
+    })
+
+
+    for (s in 1:n.subpops)
+    {
+        if (d[s] > 0)
+        {
+            subpops.related <- rep(FALSE, n.subpops)
+            for (si in 1:n.subpops)
+            {
+                if (s %in% BelowList[[si]])
+                {
+                    subpops.related[si] <- TRUE
+                }
+            }
+            subpops.related <- which(subpops.related)
+            if (length(subpops.related))
+            {
+                component.list[[s]] <- vector(mode = "list", length = length(subpops.related))
+                for (si in 1:length(subpops.related))
+                {
+                    idx.cur <- subpops.related[si]
+                    component.list[[s]][[si]] <- mat.list[[idx.cur]][,which(BelowListCols[[idx.cur]] == s),drop = FALSE]
+                }
+            }
+        }
+    }
+
+    component.list
 }
 
 
@@ -176,6 +233,103 @@ vec2subpopMatsUnconstr <- function(vec, p, d, cond.mat, incl.none = FALSE)
         }
     }
     mat.list
+}
+
+vec2subpopMatsUnconstrConstr <- function(vec, p, d, cond.mat, incl.none = FALSE)
+{
+    # d here needs to be the total ncols for each beta matrix
+    n.conditions    <- as.integer(log2(length(d) + !incl.none))
+    n.subpops       <- length(d)
+    #cond.mat       <- subpop.struct(n.conditions, incl.none)
+    mat.list        <- vector(mode = "list", length = n.subpops)
+    nnz             <- sum(d > 0)
+
+    BelowList <- createBelowList(cond.mat)
+
+
+    cumul.params    <- c(0, cumsum(d * p))
+    for (s in 1:n.subpops)
+    {
+        if (d[s] > 0)
+        {
+            vec.idx <- (cumul.params[s] + 1):cumul.params[s + 1]
+            mat.list[[s]] <- matrix(vec[vec.idx], ncol = d[s])
+        }
+    }
+
+    component.list <- subpopMats2components(mat.list, p, d, cond.mat, incl.none)
+
+    for (i in 1:length(component.list))
+    {
+        if (!is.null(component.list[[i]]))
+        {
+            for (s in 1:length(component.list[[i]]))
+            {
+                if (s == 1)
+                {
+                    tmp <- component.list[[i]][[s]]
+                } else
+                {
+                    tmp <- tmp + component.list[[i]][[s]]
+                }
+            }
+            tmp <- tmp / length(component.list[[i]])
+            component.list[[i]] <- tmp
+        }
+    }
+
+    for (s in 1:n.subpops)
+    {
+        mat.list[[s]] <- do.call(cbind, component.list[BelowList[[s]]])
+    }
+    mat.list
+}
+
+
+Unconstrvec2Constrvec <- function(vec, p, d, cond.mat, incl.none = FALSE)
+{
+    # d here needs to be the total ncols for each beta matrix
+    n.conditions    <- as.integer(log2(length(d) + !incl.none))
+    n.subpops       <- length(d)
+    #cond.mat       <- subpop.struct(n.conditions, incl.none)
+    mat.list        <- vector(mode = "list", length = n.subpops)
+    nnz             <- sum(d > 0)
+
+    BelowList <- createBelowList(cond.mat)
+
+
+    cumul.params    <- c(0, cumsum(d * p))
+    for (s in 1:n.subpops)
+    {
+        if (d[s] > 0)
+        {
+            vec.idx <- (cumul.params[s] + 1):cumul.params[s + 1]
+            mat.list[[s]] <- matrix(vec[vec.idx], ncol = d[s])
+        }
+    }
+
+    component.list <- subpopMats2components(mat.list, p, d, cond.mat, incl.none)
+
+    for (i in 1:length(component.list))
+    {
+        if (!is.null(component.list[[i]]))
+        {
+            for (s in 1:length(component.list[[i]]))
+            {
+                if (s == 1)
+                {
+                    tmp <- component.list[[i]][[s]]
+                } else
+                {
+                    tmp <- tmp + component.list[[i]][[s]]
+                }
+            }
+            tmp <- tmp / length(component.list[[i]])
+            component.list[[i]] <- tmp[-c(1:ncol(tmp)),]
+        }
+    }
+
+    unlist(component.list)
 }
 
 
@@ -340,7 +494,7 @@ semi.phd.hier.newton <- function(x.list, y, d = rep(1L, 3L),
                                                 "bfgs.x",
                                                 "lbfgs",
                                                 "spg", "ucminf"),
-                                 init.method = c("phd", "random"),
+                                 init.method = c("random", "phd"),
                                  optimize.nn = FALSE,
                                  nn = NULL, calc.mse = FALSE,
                                  verbose = TRUE, ...)
@@ -666,7 +820,7 @@ semi.phd.hier.newton <- function(x.list, y, d = rep(1L, 3L),
                 best.par   <- par.cur
             }
         }
-        init <- best.par
+        init.rand <- best.par
     }
 
 
@@ -804,16 +958,41 @@ semi.phd.hier.newton <- function(x.list, y, d = rep(1L, 3L),
     # test which nn values minimize the most effectively
     if (is.null(nn))
     {
-        nn <- try.nn(nn.vals      = c(0.15, 0.25, 0.5, 0.75, 0.9, 0.95),
+        tryval <- try.nn(nn.vals      = c(0.15, 0.25, 0.5, 0.75, 0.9, 0.95),
                      init         = init,
                      est.eqn      = est.eqn,
                      est.eqn.grad = est.eqn.grad,
-                     opt.method   = opt.method,
+                     opt.method   = "spg",
                      optimize.nn  = optimize.nn,
-                     maxit        = 10L,
+                     maxit        = 15L,
                      verbose      = verbose)
+        nn   <- tryval$nn
+        init <- tryval$par
+
+        if (init.method == "random")
+        {
+            tryval2 <- try.nn(nn.vals      = c(0.15, 0.25, 0.5, 0.75, 0.9, 0.95),
+                             init         = init,
+                             est.eqn      = est.eqn,
+                             est.eqn.grad = est.eqn.grad,
+                             opt.method   = "spg",
+                             optimize.nn  = optimize.nn,
+                             maxit        = 15L,
+                             verbose      = verbose)
+            nn2   <- tryval2$nn
+            init2 <- tryval2$par
+
+            if (tryval$value > tryval2$value)
+            {
+                init <- init2
+                nn   <- nn2
+            }
+        }
 
         if (verbose) print(paste("best nn:", nn))
+    } else
+    {
+        if (init.method == "random") init <- init.rand
     }
 
     slver <- opt.est.eqn(init         = init,
@@ -824,7 +1003,6 @@ semi.phd.hier.newton <- function(x.list, y, d = rep(1L, 3L),
                          optimize.nn  = optimize.nn,
                          maxit        = maxit,
                          verbose      = verbose)
-
 
     if (verbose)
     {
@@ -837,18 +1015,23 @@ semi.phd.hier.newton <- function(x.list, y, d = rep(1L, 3L),
     beta <- beta.init
 
     cond.mat <- subpop.struct(2L)
-    #beta.mat.list <- vec2subpopMats(slver$par, p, d, cond.mat)
     beta.mat.list <- vec2subpopMatsId(slver$par, p, d, cond.mat)
 
     if (verbose) print("Unconstr opt")
     slver.unconstr <- opt.est.eqn(init         = unlist(beta.mat.list),
                                   est.eqn      = est.eqn.unconstr,
-                                  est.eqn.grad = est.eqn.unconstr.grad,
+                                  est.eqn.grad = est.eqn.grad.unconstr,
                                   opt.method   = opt.method,
                                   nn           = nn,
                                   optimize.nn  = optimize.nn,
                                   maxit        = 50,
                                   verbose      = verbose)
+
+    #init2 <- Unconstrvec2Constrvec(slver.unconstr$par, p, d, cond.mat)
+    #value.init2 <- est.eqn.vic(init2, nn.val = nn)
+
+
+
 
     #beta.mat.list <- vector(mode = "list", length = 3L)
 
@@ -914,7 +1097,8 @@ semi.phd.hier.newton <- function(x.list, y, d = rep(1L, 3L),
     beta      <- beta.init # t(t(beta.init) %*% sqrt.inv.cov)
 
 
-    list(beta = beta.mat.list, beta.init = beta, solver.obj = slver,
+    list(beta = beta.mat.list, beta.init = beta,
+         solver.obj = slver,
          #beta.rand.init = t(t(beta.rand.init) %*% sqrt.inv.cov),
          cov = cov, sqrt.inv.cov = sqrt.inv.cov,
          nn  = nn,
@@ -1279,14 +1463,17 @@ hier.s.phd <- function(x, y, z, z.combinations, d,
     # test which nn values minimize the most effectively
     if (is.null(nn))
     {
-        nn <- try.nn(nn.vals      = c(0.1, 0.25, 0.5, 0.75, 0.9, 0.95),
-                     init         = init,
-                     est.eqn      = est.eqn,
-                     est.eqn.grad = est.eqn.grad,
-                     opt.method   = opt.method,
-                     optimize.nn  = optimize.nn,
-                     maxit        = 10L,
-                     verbose      = verbose)
+        tryval <- try.nn(nn.vals      = c(0.1, 0.25, 0.5, 0.75, 0.9, 0.95),
+                         init         = init,
+                         est.eqn      = est.eqn,
+                         est.eqn.grad = est.eqn.grad,
+                         opt.method   = opt.method,
+                         optimize.nn  = optimize.nn,
+                         maxit        = 10L,
+                         verbose      = verbose)
+
+        nn   <- tryval$nn
+        init <- tryval$par
 
         if (verbose) print(paste("best nn:", nn))
     }

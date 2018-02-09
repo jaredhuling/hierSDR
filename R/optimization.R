@@ -145,6 +145,7 @@ try.nn <- function(nn.vals = c(0.1, 0.25, 0.5, 0.75, 0.9, 0.95),
 {
     n.try  <- length(nn.vals)
     values <- numeric(n.try)
+    parm.list <- vector(mode = "list", length = n.try)
     for (i in 1:n.try)
     {
         slver.cur <- opt.est.eqn(init         = init,
@@ -159,6 +160,7 @@ try.nn <- function(nn.vals = c(0.1, 0.25, 0.5, 0.75, 0.9, 0.95),
         if (verbose) cat("nn:", nn.vals[i], "; f(x) =", slver.cur$value, "\n")
 
         values[i] <- slver.cur$value
+        parm.list[[i]] <- slver.cur$par
     }
-    nn.vals[which.min(values)]
+    list(nn = nn.vals[which.min(values)], par = parm.list[[which.min(values)]], value = min(values))
 }
