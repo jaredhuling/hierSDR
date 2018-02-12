@@ -1142,26 +1142,26 @@ hasAllConds <- function(checkvec, combvec)
 }
 
 
-hier.s.phd <- function(x, y, z, z.combinations, d,
-                       maxit = 250L, h = NULL, B = NULL, vic = FALSE,
-                       weights = rep(1L, NROW(y)),
-                       opt.method = c("lbfgs2", "lbfgs.x",
-                                      "bfgs.x",
-                                      "bfgs",
-                                      "lbfgs",
-                                      "spg",
-                                      "ucminf",
-                                      "CG",
-                                      "nlm",
-                                      "nlminb",
-                                      "newuoa"),
-                       init.method = c("random", "phd"),
-                       nn = NULL,
-                       optimize.nn = FALSE,
-                       separate.nn = TRUE,
-                       calc.mse = FALSE,
-                       constrain.none.subpop = FALSE,
-                       verbose = TRUE, ...)
+hier.sphd <- function(x, y, z, z.combinations, d,
+                      maxit = 250L, h = NULL, B = NULL, vic = FALSE,
+                      weights = rep(1L, NROW(y)),
+                      opt.method = c("lbfgs2", "lbfgs.x",
+                                     "bfgs.x",
+                                     "bfgs",
+                                     "lbfgs",
+                                     "spg",
+                                     "ucminf",
+                                     "CG",
+                                     "nlm",
+                                     "nlminb",
+                                     "newuoa"),
+                      init.method = c("random", "phd"),
+                      nn = NULL,
+                      optimize.nn = FALSE,
+                      separate.nn = TRUE,
+                      calc.mse = FALSE,
+                      constrain.none.subpop = FALSE,
+                      verbose = TRUE, ...)
 {
 
     nobs <- NROW(x)
@@ -1320,7 +1320,7 @@ hier.s.phd <- function(x, y, z, z.combinations, d,
     Proj.constr.list <- Proj.constr.list[!sapply(Proj.constr.list, is.null)]
 
     #eig.V <- eigen(V.hat)
-    beta.init      <- do.call(cbind, beta.list) #eig.V$vectors[,1:d,drop=FALSE]
+    beta.init     <- do.call(cbind, beta.list) #eig.V$vectors[,1:d,drop=FALSE]
 
     unique.strata <- unique(strat.id)
     num.strata    <- length(unique.strata)
@@ -1416,6 +1416,51 @@ hier.s.phd <- function(x, y, z, z.combinations, d,
     }
 
 
+    est.eqn.vic <- function(beta.vec, nn.val, v = 1)
+    {
+
+        beta.mat.list <- vec2subpopMatsIdVIC(beta.vec, p, d, z.combinations, v = v)
+
+        Ey.given.xbeta <- numeric(nobs)
+
+        if (length(nn.val) == 1)
+        {
+            nn.val <- rep(nn.val, length(beta.mat.list))
+        }
+
+        for (s in 1:n.combinations)
+        {
+            strata.idx <- strat.idx.list[[s]]
+            dir.cur    <- x.tilde[[s]] %*% beta.mat.list[[s]]
+
+            # remove a direction if it has no variation.
+            # this should never happen, but just in case
+            dir.cur    <- dir.cur[,which(apply(dir.cur, 2, sd) != 0)]
+
+            sd <- sd(dir.cur)
+
+            best.h <- sd * (0.75 * nrow(dir.cur)) ^ (-1 / (ncol(dir.cur) + 4) )
+
+            locfit.mod <- locfit.raw(x = dir.cur, y = y.list[[s]],
+                                     kern = "trwt", kt = "prod",
+                                     alpha = c(nn.val[s], best.h), deg = 2, ...)
+
+
+
+            Ey.given.xbeta[strata.idx] <- fitted(locfit.mod)
+        }
+
+
+        lhs   <- sum(unlist(lapply(1:n.combinations, function(i) {
+            strata.idx <- strat.idx.list[[i]]
+            resid      <- drop(y.list[[i]] - Ey.given.xbeta[strata.idx])
+            wts.cur    <- weights.list[[i]]
+            norm(crossprod(x.tilde[[i]], (wts.cur * resid) * x.tilde[[i]]), type = "F") ^ 2
+        })))
+        lhs / sum(weights)
+    }
+
+
 
     #######    model fitting to determine bandwidth     ########
 
@@ -1479,47 +1524,6 @@ hier.s.phd <- function(x, y, z, z.combinations, d,
 
 
 
-    est.eqn.vic <- function(beta.vec, nn.val, v = 1)
-    {
-
-        beta.mat.list <- vec2subpopMatsIdVIC(beta.vec, p, d, z.combinations, v = v)
-
-        Ey.given.xbeta <- numeric(nobs)
-
-        if (length(nn.val) == 1)
-        {
-            nn.val <- rep(nn.val, length(beta.mat.list))
-        }
-
-        for (s in 1:n.combinations)
-        {
-            strata.idx <- strat.idx.list[[s]]
-            dir.cur    <- x.tilde[[s]] %*% beta.mat.list[[s]]
-
-            # remove a direction if it has no variation.
-            # this should never happen, but just in case
-            dir.cur    <- dir.cur[,which(apply(dir.cur, 2, sd) != 0)]
-
-            sd <- sd(dir.cur)
-
-            best.h <- sd * (0.75 * nrow(dir.cur)) ^ (-1 / (ncol(dir.cur) + 4) )
-
-            locfit.mod <- locfit.raw(x = dir.cur, y = y.list[[s]],
-                                     kern = "trwt", kt = "prod",
-                                     alpha = c(nn.val[s], best.h), deg = 1, ...)
-
-            Ey.given.xbeta[strata.idx] <- fitted(locfit.mod)
-        }
-
-
-        lhs   <- sum(unlist(lapply(1:length(x.tilde), function(i) {
-            strata.idx <- strat.idx.list[[i]]
-            resid      <- drop(y.list[[i]] - Ey.given.xbeta[strata.idx])
-            wts.cur    <- weights.list[[i]]
-            norm(crossprod(x.tilde[[i]], (wts.cur * resid) * x.tilde[[i]]), type = "F") ^ 2
-        })))
-        lhs / sum(weights)
-    }
 
 
 
