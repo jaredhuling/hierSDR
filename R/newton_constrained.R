@@ -1493,6 +1493,8 @@ hier.sphd <- function(x, y, z, z.combinations, d,
     d2   <- sapply(vec2subpopMatsId(init, p, d, z.combinations), ncol)
     npar <- sum(p * d - d ^ 2)
 
+    value.init <- est.eqn(init, nn.val = nn)
+
     if (init.method == "random")
     {
         n.samples <- 100
@@ -1633,7 +1635,7 @@ hier.sphd <- function(x, y, z, z.combinations, d,
          beta.init = beta.init,
          cov = cov, sqrt.inv.cov = sqrt.inv.cov,
          solver.obj = slver,
-         value = slver$value, value.init = est.eqn(init, nn.val = nn),
+         value = slver$value, value.init = value.init,
          vic.est.eqn = vic.eqn, vic.eqns = vic.eqns,
          vic = vic, vic2 = vic2, vic3 = vic3,
          sse = sse.vec, mse = mse.vec)
