@@ -493,10 +493,17 @@ semi.phd.hier.newton <- function(x.list, y, d = rep(1L, 3L),
                                  opt.method = c("lbfgs.x", "bfgs", "lbfgs2",
                                                 "bfgs.x",
                                                 "lbfgs",
-                                                "spg", "ucminf"),
+                                                "spg",
+                                                "ucminf",
+                                                "CG",
+                                                "nlm",
+                                                "nlminb",
+                                                "newuoa"),
                                  init.method = c("random", "phd"),
                                  optimize.nn = FALSE,
-                                 nn = NULL, calc.mse = FALSE,
+                                 nn = NULL,
+                                 separate.nn = TRUE,
+                                 calc.mse = FALSE,
                                  verbose = TRUE, ...)
 {
     p <- nvars <- ncol(x.list[[1]])
@@ -581,6 +588,11 @@ semi.phd.hier.newton <- function(x.list, y, d = rep(1L, 3L),
             beta.mat.list <- vec2subpopMatsId(beta.vec, p, d, cond.mat)
         }
 
+        if (length(nn.val) == 1)
+        {
+            nn.val <- rep(nn.val, length(beta.mat.list))
+        }
+
 
         #t(t(matrix(beta.vec, ncol = d * length(constraints))) %*% sqrt.inv.cov)
 
@@ -615,7 +627,7 @@ semi.phd.hier.newton <- function(x.list, y, d = rep(1L, 3L),
             {
                 locfit.mod <- locfit.raw(x = dir.cur, y = y[strata.idx],
                                          kern = "trwt", kt = "prod",
-                                         alpha = c(nn.val, best.h), deg = 2, ...)
+                                         alpha = c(nn.val[s], best.h), deg = 2, ...)
             }
 
 
@@ -719,6 +731,11 @@ semi.phd.hier.newton <- function(x.list, y, d = rep(1L, 3L),
             beta.mat.list <- vec2subpopMatsUnconstr(beta.vec, p, d2, cond.mat)
         }
 
+        if (length(nn.val) == 1)
+        {
+            nn.val <- rep(nn.val, length(beta.mat.list))
+        }
+
 
         #t(t(matrix(beta.vec, ncol = d * length(constraints))) %*% sqrt.inv.cov)
 
@@ -753,7 +770,7 @@ semi.phd.hier.newton <- function(x.list, y, d = rep(1L, 3L),
             {
                 locfit.mod <- locfit.raw(x = dir.cur, y = y[strata.idx],
                                          kern = "trwt", kt = "prod",
-                                         alpha = c(nn.val, best.h), deg = 2, ...)
+                                         alpha = c(nn.val[s], best.h), deg = 2, ...)
             }
 
 
@@ -885,6 +902,11 @@ semi.phd.hier.newton <- function(x.list, y, d = rep(1L, 3L),
 
         Ey.given.xbeta <- numeric(nobs)
 
+        if (length(nn.val) == 1)
+        {
+            nn.val <- rep(nn.val, length(beta.mat.list))
+        }
+
         for (s in 1:num.strata)
         {
             strata.idx <- which(strat.id == unique.strata[s])
@@ -901,11 +923,11 @@ semi.phd.hier.newton <- function(x.list, y, d = rep(1L, 3L),
 
             sd <- sd(dir.cur)
 
-            best.h <- sd * (0.75 * nrow(dir.cur)) ^ (-1/(ncol(dir.cur)+4) )
+            best.h <- sd * (0.75 * nrow(dir.cur)) ^ (-1 / (ncol(dir.cur) + 4) )
 
             locfit.mod <- locfit.raw(x = dir.cur, y = y[strata.idx],
                                      kern = "trwt", kt = "prod",
-                                     alpha = c(nn.val, best.h), deg = 2, ...)
+                                     alpha = c(nn.val[s], best.h), deg = 2, ...)
 
             Ey.given.xbeta[strata.idx] <- fitted(locfit.mod)
         }
@@ -959,26 +981,30 @@ semi.phd.hier.newton <- function(x.list, y, d = rep(1L, 3L),
     if (is.null(nn))
     {
         tryval <- try.nn(nn.vals      = c(0.15, 0.25, 0.5, 0.75, 0.9, 0.95),
-                     init         = init,
-                     est.eqn      = est.eqn,
-                     est.eqn.grad = est.eqn.grad,
-                     opt.method   = "spg",
-                     optimize.nn  = optimize.nn,
-                     maxit        = 15L,
-                     verbose      = verbose)
+                         init         = init,
+                         est.eqn      = est.eqn,
+                         est.eqn.grad = est.eqn.grad,
+                         opt.method   = "spg",
+                         optimize.nn  = optimize.nn,
+                         separate.nn  = separate.nn,
+                         num.subpops  = num.strata,
+                         maxit        = 20L,
+                         verbose      = verbose)
         nn   <- tryval$nn
         init <- tryval$par
 
         if (init.method == "random")
         {
             tryval2 <- try.nn(nn.vals      = c(0.15, 0.25, 0.5, 0.75, 0.9, 0.95),
-                             init         = init,
-                             est.eqn      = est.eqn,
-                             est.eqn.grad = est.eqn.grad,
-                             opt.method   = "spg",
-                             optimize.nn  = optimize.nn,
-                             maxit        = 15L,
-                             verbose      = verbose)
+                              init         = init.rand,
+                              est.eqn      = est.eqn,
+                              est.eqn.grad = est.eqn.grad,
+                              opt.method   = "spg",
+                              optimize.nn  = optimize.nn,
+                              separate.nn  = separate.nn,
+                              num.subpops  = num.strata,
+                              maxit        = 20L,
+                              verbose      = verbose)
             nn2   <- tryval2$nn
             init2 <- tryval2$par
 
@@ -1123,10 +1149,16 @@ hier.s.phd <- function(x, y, z, z.combinations, d,
                                       "bfgs.x",
                                       "bfgs",
                                       "lbfgs",
-                                      "spg", "ucminf"),
-                       init.method = c("phd", "random"),
+                                      "spg",
+                                      "ucminf",
+                                      "CG",
+                                      "nlm",
+                                      "nlminb",
+                                      "newuoa"),
+                       init.method = c("random", "phd"),
                        nn = NULL,
                        optimize.nn = FALSE,
+                       separate.nn = TRUE,
                        calc.mse = FALSE,
                        constrain.none.subpop = FALSE,
                        verbose = TRUE, ...)
@@ -1281,15 +1313,6 @@ hier.s.phd <- function(x, y, z, z.combinations, d,
             eig.c          <- eigen(Proj.constr.list[[c]] %*% V.hat )
             eta.hat        <- eig.c$vectors[,1:d[c], drop=FALSE]
             beta.list[[c]] <- Re(eta.hat)
-
-            if (init.method == "random")
-            {
-                beta.list[[c]] <- Proj.constr.list[[c]] %*%
-                    matrix(runif(prod(dim(eta.hat)),
-                                 min = min(beta.list[[c]]),
-                                 max = max(beta.list[[c]])),
-                           ncol = NCOL(eta.hat))
-            }
         }
     }
 
@@ -1308,33 +1331,20 @@ hier.s.phd <- function(x, y, z, z.combinations, d,
         beta.component.init[[s]] <- beta.list[[s]][(p * (s - 1) + 1):(p * s),,drop = FALSE]
     }
 
+    beta.component.init <- lapply(beta.component.init, function(bb) {
+        if (!is.null(bb))
+        {
+            nc <- ncol(bb)
+            bb[(nc + 1):nrow(bb),]
+        } else
+        {
+            NULL
+        }
+    })
+
+    init <- unlist(beta.component.init)
 
 
-    #######    model fitting to determine bandwidth     ########
-
-    best.h.vec <- numeric(num.strata)
-
-    if (is.null(h))
-    {
-        h <- exp(seq(log(0.1), log(25), length.out = 25))
-    }
-
-    beta.init.cov <- t(t(beta.init) %*% sqrt.inv.cov.b)
-    for (s in 1:n.combinations)
-    {
-        strata.idx <- strat.idx.list[[s]]
-        dir.cur    <- x.tilde.b[strata.idx, ((s - 1) * pp + 1):(s * pp)] %*%
-            beta.init[((s - 1) * pp + 1):(s * pp),,drop=FALSE]
-
-        # remove irrelevant dimensions
-        dir.cur    <- dir.cur[, which(apply(dir.cur, 2, sd) != 0)]
-
-        gcv.vals   <- sapply(h, function(hv) gcv(x = dir.cur,
-                                                 y = y[strata.idx],
-                                                 kern = "trwt", kt = "prod",
-                                                 alpha = hv, deg = 3, ...)[4])
-        best.h.vec[s]     <- h[which.min(gcv.vals)]
-    }
 
     est.eqn <- function(beta.vec, nn.val, optimize.nn = FALSE)
     {
@@ -1348,20 +1358,21 @@ hier.s.phd <- function(x, y, z, z.combinations, d,
 
         Ey.given.xbeta <- numeric(nobs)
 
+        if (length(nn.val) == 1)
+        {
+            nn.val <- rep(nn.val, length(beta.mat.list))
+        }
+
+
+
         for (s in 1:n.combinations)
         {
             strata.idx <- strat.idx.list[[s]]
             dir.cur    <- x.tilde[[s]] %*% beta.mat.list[[s]]
 
+            # remove any directions with no variation.
             # probably not needed, but just in case
             dir.cur    <- dir.cur[,which(apply(dir.cur, 2, sd) != 0), drop = FALSE]
-
-
-            #gcv.vals   <- sapply(h, function(hv) gcv(x = dir.cur,
-            #                                         y = y[strata.idx],
-            #                                         kern = "gauss",
-            #                                         alpha = hv, deg = 3, ...)[4])
-            best.h     <- best.h.vec[s] # h[which.min(gcv.vals)]
 
             sd <- sd(dir.cur)
 
@@ -1376,7 +1387,7 @@ hier.s.phd <- function(x, y, z, z.combinations, d,
             {
                 locfit.mod <- locfit.raw(x = dir.cur, y = y.list[[s]],
                                          kern = "trwt", kt = "prod",
-                                         alpha = c(nn.val, best.h), deg = 2, ...)
+                                         alpha = c(nn.val[s], best.h), deg = 2, ...)
             }
 
             # locfit.mod <- locfit.raw(x = dir.cur, y = y[strata.idx],
@@ -1400,9 +1411,72 @@ hier.s.phd <- function(x, y, z, z.combinations, d,
     est.eqn.grad <- function(beta.vec, nn.val, optimize.nn = FALSE)
     {
         grad.full     <- grad(est.eqn, beta.vec, method = "simple", nn.val = nn.val, optimize.nn = optimize.nn)
-        if (verbose) cat("grad norm: ", sqrt(sum(grad.full ^ 2)), "\n")
+        if (verbose > 1) cat("grad norm: ", sqrt(sum(grad.full ^ 2)), "\n")
         grad.full
     }
+
+
+
+    #######    model fitting to determine bandwidth     ########
+
+    best.h.vec <- numeric(num.strata)
+
+    if (is.null(h))
+    {
+        h <- exp(seq(log(0.1), log(25), length.out = 25))
+    }
+
+    beta.init.cov <- t(t(beta.init) %*% sqrt.inv.cov.b)
+    # for (s in 1:n.combinations)
+    # {
+    #     strata.idx <- strat.idx.list[[s]]
+    #     dir.cur    <- x.tilde.b[strata.idx, ((s - 1) * pp + 1):(s * pp)] %*%
+    #         beta.init[((s - 1) * pp + 1):(s * pp),,drop=FALSE]
+    #
+    #     # remove irrelevant dimensions
+    #     dir.cur    <- dir.cur[, which(apply(dir.cur, 2, sd) != 0)]
+    #
+    #     gcv.vals   <- sapply(h, function(hv) gcv(x = dir.cur,
+    #                                              y = y[strata.idx],
+    #                                              kern = "trwt", kt = "prod",
+    #                                              alpha = hv, deg = 3, ...)[4])
+    #     best.h.vec[s]     <- h[which.min(gcv.vals)]
+    # }
+
+
+
+    d2   <- sapply(vec2subpopMatsId(init, p, d, z.combinations), ncol)
+    npar <- sum(p * d - d ^ 2)
+
+    if (init.method == "random")
+    {
+        n.samples <- 100
+        beta.list.phd <- beta.list.tmp <- beta.list
+        best.value <- 1e99
+
+        nn.vals <- c(0.15, 0.25, 0.5, 0.75, 0.9, 0.95)
+        for (tr in 1:n.samples)
+        {
+            par.cur <- runif(npar, min = min(init), max = max(init))
+
+            values.cur <- numeric(length(nn.vals))
+            for (i in 1:length(nn.vals) )
+            {
+                nh <- nn.vals[i]
+                values.cur[i] <- est.eqn(par.cur, nn.val = nh)
+            }
+
+            value.cur <- min(values.cur)
+            if (value.cur < best.value)
+            {
+                best.value <- value.cur
+                best.par   <- par.cur
+            }
+        }
+        init.rand <- best.par
+    }
+
+
 
 
     est.eqn.vic <- function(beta.vec, nn.val, v = 1)
@@ -1412,19 +1486,19 @@ hier.s.phd <- function(x, y, z, z.combinations, d,
 
         Ey.given.xbeta <- numeric(nobs)
 
+        if (length(nn.val) == 1)
+        {
+            nn.val <- rep(nn.val, length(beta.mat.list))
+        }
+
         for (s in 1:n.combinations)
         {
             strata.idx <- strat.idx.list[[s]]
             dir.cur    <- x.tilde[[s]] %*% beta.mat.list[[s]]
-            #print(apply(dir.cur, 2, sd))
+
+            # remove a direction if it has no variation.
+            # this should never happen, but just in case
             dir.cur    <- dir.cur[,which(apply(dir.cur, 2, sd) != 0)]
-
-
-            #gcv.vals   <- sapply(h, function(hv) gcv(x = dir.cur,
-            #                                         y = y[strata.idx],
-            #                                         kern = "gauss",
-            #                                         alpha = hv, deg = 3, ...)[4])
-            best.h     <- best.h.vec[s] # h[which.min(gcv.vals)]
 
             sd <- sd(dir.cur)
 
@@ -1432,7 +1506,7 @@ hier.s.phd <- function(x, y, z, z.combinations, d,
 
             locfit.mod <- locfit.raw(x = dir.cur, y = y.list[[s]],
                                      kern = "trwt", kt = "prod",
-                                     alpha = c(nn.val, best.h), deg = 1, ...)
+                                     alpha = c(nn.val[s], best.h), deg = 1, ...)
 
             Ey.given.xbeta[strata.idx] <- fitted(locfit.mod)
         }
@@ -1447,35 +1521,53 @@ hier.s.phd <- function(x, y, z, z.combinations, d,
         lhs / sum(weights)
     }
 
-    beta.component.init <- lapply(beta.component.init, function(bb) {
-        if (!is.null(bb))
-        {
-            nc <- ncol(bb)
-            bb[(nc + 1):nrow(bb),]
-        } else
-        {
-            NULL
-        }
-    })
 
-    init <- unlist(beta.component.init)
+
+
 
     # test which nn values minimize the most effectively
     if (is.null(nn))
     {
-        tryval <- try.nn(nn.vals      = c(0.1, 0.25, 0.5, 0.75, 0.9, 0.95),
+        tryval <- try.nn(nn.vals      = c(0.15, 0.25, 0.5, 0.75, 0.9, 0.95),
                          init         = init,
                          est.eqn      = est.eqn,
                          est.eqn.grad = est.eqn.grad,
-                         opt.method   = opt.method,
+                         opt.method   = "spg",
                          optimize.nn  = optimize.nn,
-                         maxit        = 10L,
+                         separate.nn  = separate.nn,
+                         num.subpops  = n.combinations,
+                         maxit        = 20L,
                          verbose      = verbose)
-
         nn   <- tryval$nn
         init <- tryval$par
 
+
+        if (init.method == "random")
+        {
+            tryval2 <- try.nn(nn.vals      = c(0.15, 0.25, 0.5, 0.75, 0.9, 0.95),
+                              init         = init.rand,
+                              est.eqn      = est.eqn,
+                              est.eqn.grad = est.eqn.grad,
+                              opt.method   = "spg",
+                              optimize.nn  = optimize.nn,
+                              separate.nn  = separate.nn,
+                              num.subpops  = n.combinations,
+                              maxit        = 20L,
+                              verbose      = verbose)
+            nn2   <- tryval2$nn
+            init2 <- tryval2$par
+
+            if (tryval$value > tryval2$value)
+            {
+                init <- init2
+                nn   <- nn2
+            }
+        }
+
         if (verbose) print(paste("best nn:", nn))
+    } else
+    {
+        if (init.method == "random") init <- init.rand
     }
 
     slver <- opt.est.eqn(init         = init,

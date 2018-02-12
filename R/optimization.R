@@ -8,7 +8,11 @@ opt.est.eqn <- function(init, est.eqn, est.eqn.grad,
                                        "bfgs",
                                        "lbfgs",
                                        "ucminf",
-                                       "spg"),
+                                       "spg",
+                                       "CG",
+                                       "nlm",
+                                       "nlminb",
+                                       "newuoa"),
                         nn = 0.75,
                         optimize.nn = FALSE, maxit = 100, verbose = FALSE)
 {
@@ -141,26 +145,94 @@ try.nn <- function(nn.vals = c(0.1, 0.25, 0.5, 0.75, 0.9, 0.95),
                                   "bfgs.x",
                                   "lbfgs",
                                   "spg", "ucminf"),
-                   optimize.nn = FALSE, maxit = 10, verbose = FALSE)
+                   optimize.nn = FALSE,
+                   separate.nn = FALSE,
+                   num.subpops = 1,
+                   maxit = 10, verbose = FALSE)
 {
     n.try  <- length(nn.vals)
-    values <- numeric(n.try)
-    parm.list <- vector(mode = "list", length = n.try)
-    for (i in 1:n.try)
+
+    warn_handle <- function(w)
     {
-        slver.cur <- opt.est.eqn(init         = init,
-                                 est.eqn      = est.eqn,
-                                 est.eqn.grad = est.eqn.grad,
-                                 opt.method   = opt.method,
-                                 nn           = nn.vals[i],
-                                 optimize.nn  = optimize.nn,
-                                 maxit        = maxit,
-                                 verbose      = verbose > 1)
-
-        if (verbose) cat("nn:", nn.vals[i], "; f(x) =", slver.cur$value, "\n")
-
-        values[i] <- slver.cur$value
-        parm.list[[i]] <- slver.cur$par
+        if( any( grepl("Unsuccessful convergence.", w) ) |
+            any( grepl("arguments ignored", w) ) |
+            any( grepl("not recommended", w) )
+            )
+        {
+            invokeRestart( "muffleWarning" )
+        }
     }
-    list(nn = nn.vals[which.min(values)], par = parm.list[[which.min(values)]], value = min(values))
+
+    if (separate.nn & num.subpops > 1)
+    {
+        nn.best <- rep(max(nn.vals), num.subpops)
+
+
+        for (s in 1:num.subpops)
+        {
+            if (s == num.subpops)
+            {
+                parm.list <- vector(mode = "list", length = n.try)
+            }
+
+            values  <- numeric(n.try)
+
+            nn.vals.cur <- nn.best
+            for (i in 1:n.try)
+            {
+                nn.vals.cur[s] <- nn.vals[i]
+                slver.cur <- withCallingHandlers({
+                    opt.est.eqn(init         = init,
+                                est.eqn      = est.eqn,
+                                est.eqn.grad = est.eqn.grad,
+                                opt.method   = opt.method,
+                                nn           = nn.vals.cur,
+                                optimize.nn  = optimize.nn,
+                                maxit        = maxit,
+                                verbose      = verbose > 1)
+                }, warning = warn_handle)
+
+                if (verbose) cat("subpop:", s, "; nn:", nn.vals[i], "; f(x) =", slver.cur$value, "\n")
+
+                values[i] <- slver.cur$value
+                if (s == num.subpops)
+                {
+                    parm.list[[i]] <- slver.cur$par
+                }
+            }
+            nn.best[s] <- nn.vals[which.min(values)]
+
+            if (s == num.subpops)
+            {
+                ret <- list(nn    = nn.best,
+                            par   = parm.list[[which.min(values)]],
+                            value = min(values))
+            }
+        }
+
+    } else
+    {
+        values <- numeric(n.try)
+        parm.list <- vector(mode = "list", length = n.try)
+        for (i in 1:n.try)
+        {
+            slver.cur <- withCallingHandlers({
+                opt.est.eqn(init         = init,
+                            est.eqn      = est.eqn,
+                            est.eqn.grad = est.eqn.grad,
+                            opt.method   = opt.method,
+                            nn           = nn.vals[i],
+                            optimize.nn  = optimize.nn,
+                            maxit        = maxit,
+                            verbose      = verbose > 1)
+            }, warning = warn_handle)
+
+            if (verbose) cat("nn:", nn.vals[i], "; f(x) =", slver.cur$value, "\n")
+
+            values[i] <- slver.cur$value
+            parm.list[[i]] <- slver.cur$par
+        }
+        ret <- list(nn = nn.vals[which.min(values)], par = parm.list[[which.min(values)]], value = min(values))
+    }
+    ret
 }
