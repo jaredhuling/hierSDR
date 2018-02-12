@@ -1158,7 +1158,7 @@ hier.sphd <- function(x, y, z, z.combinations, d,
                       init.method = c("random", "phd"),
                       nn = NULL,
                       optimize.nn = FALSE,
-                      separate.nn = TRUE,
+                      separate.nn = FALSE,
                       calc.mse = FALSE,
                       constrain.none.subpop = FALSE,
                       verbose = TRUE, ...)
