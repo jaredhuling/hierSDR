@@ -215,7 +215,7 @@ semi.phd <- function(x, y, d = 5L, maxit = 10L, h = NULL,
 
     if (is.null(h))
     {
-        h <- exp(seq(log(0.1), log(25), length.out = 25))
+        h <- exp(seq(log(0.5), log(25), length.out = 25))
     }
     directions <- x.tilde %*% beta.init
     gcv.vals   <- sapply(h, function(hv) gcv(x = directions, y = y, alpha = hv, deg = 3, ...)[4])
@@ -235,7 +235,7 @@ semi.phd <- function(x, y, d = 5L, maxit = 10L, h = NULL,
 
         directions <- x.tilde %*% beta.mat
         #gcv.vals   <- sapply(h, function(hv) gcv(x = directions, y = y, alpha = hv, deg = 3, ...)[4])
-        best.h     <- best.h.init # h[which.min(gcv.vals)]
+        #best.h     <- best.h.init # h[which.min(gcv.vals)]
         sd <- sd(directions)
 
         best.h <- sd * (0.75 * nrow(directions)) ^ (-1 / (ncol(directions) + 4) )
