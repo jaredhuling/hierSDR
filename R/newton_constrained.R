@@ -502,7 +502,7 @@ semi.phd.hier.newton <- function(x.list, y, d = rep(1L, 3L),
                                  init.method = c("random", "phd"),
                                  optimize.nn = FALSE,
                                  nn = NULL,
-                                 separate.nn = TRUE,
+                                 separate.nn = FALSE,
                                  calc.mse = FALSE,
                                  verbose = TRUE, ...)
 {
