@@ -675,6 +675,7 @@ hier.sphd <- function(x, y, z, z.combinations, d,
                       vic                   = TRUE,     # should the VIC be calculated?
                       grassmann             = TRUE,     # constrain parameters to the Grassmann manifold?
                       nn                    = NULL,     # nn fraction. Will be chosen automatically if nn = NULL
+                      nn.try                = c(0.15, 0.25, 0.5, 0.75, 0.9, 0.95), # values to try if nn = NULL (more values takes longer)
                       optimize.nn           = FALSE,    # should nn be optimized? not recommended.
                       separate.nn           = FALSE,    # should each subpopulation have a separate nn? only used if nn = NULL
                       calc.mse              = FALSE,    # should the MSE of each subpop model be calculated after fitting?
@@ -1053,7 +1054,7 @@ hier.sphd <- function(x, y, z, z.combinations, d,
     # test which nn values minimize the most effectively
     if (is.null(nn))
     {
-        tryval <- try.nn(nn.vals      = c(0.15, 0.25, 0.5, 0.75, 0.9, 0.95),
+        tryval <- try.nn(nn.vals      = nn.try,
                          init         = init,
                          est.eqn      = est.eqn,
                          est.eqn.grad = est.eqn.grad,
@@ -1069,7 +1070,7 @@ hier.sphd <- function(x, y, z, z.combinations, d,
 
         if (init.method == "random")
         {
-            tryval2 <- try.nn(nn.vals      = c(0.15, 0.25, 0.5, 0.75, 0.9, 0.95),
+            tryval2 <- try.nn(nn.vals      = nn.try,
                               init         = init.rand,
                               est.eqn      = est.eqn,
                               est.eqn.grad = est.eqn.grad,
