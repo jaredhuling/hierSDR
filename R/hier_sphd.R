@@ -1130,6 +1130,12 @@ hier.sphd <- function(x, y, z, z.combinations, d,
 
     model.list <- vector(mode = "list", length = 3)
 
+    directions.list <- vector(mode = "list", length = n.combinations)
+
+    for (m in 1:n.combinations)
+    {
+        directions.list[[m]] <- x.tilde[[m]] %*% beta.mat.list[[m]]
+    }
 
     sse.vec <- mse.vec <- numeric(n.combinations)
     if (calc.mse)
@@ -1137,8 +1143,8 @@ hier.sphd <- function(x, y, z, z.combinations, d,
         for (m in 1:n.combinations)
         {
             strata.idx <- strat.idx.list[[m]]
-            best.h     <- best.h.vec[m]
-            dir.cur    <- x.tilde[[m]] %*% beta.mat.list[[m]]
+            #best.h     <- best.h.vec[m]
+            dir.cur    <- directions.list[[m]]
 
             sd <- sd(dir.cur)
 
@@ -1158,17 +1164,72 @@ hier.sphd <- function(x, y, z, z.combinations, d,
     #beta.semi <- t(t(beta.semi) %*% sqrt.inv.cov)
     #beta      <- beta.init # t(t(beta.init) %*% sqrt.inv.cov)
 
+    names(beta.mat.list) <- names(directions.list) <- combinations
 
-    list(beta         = beta.mat.list,
-         beta.init    = beta.init,
-         cov          = cov,
-         sqrt.inv.cov = sqrt.inv.cov,
-         solver.obj   = slver,
-         value        = slver$value,
-         value.init   = value.init,
-         vic.est.eqn  = vic.eqn,
-         vic.eqns     = vic.eqns,
-         vic = vic1, vic2 = vic2, vic3 = vic3,
-         sse = sse.vec, mse = mse.vec)
+
+    ret <- list(beta           = beta.mat.list,
+                beta.init      = beta.init,
+                directions     = directions.list,
+                y.list         = y.list,
+                z.combinations = z.combinations,
+                cov            = cov,
+                sqrt.inv.cov   = sqrt.inv.cov,
+                solver.obj     = slver,
+                value          = slver$value,
+                value.init     = value.init,
+                vic.est.eqn    = vic.eqn,
+                vic.eqns       = vic.eqns,
+                vic = vic1, vic2 = vic2, vic3 = vic3,
+                sse = sse.vec, mse = mse.vec)
+    class(ret) <- "hier_sdr_fit"
+    ret
 }
+
+plot.hier_sdr_fit <- function(x)
+{
+    n.subpops    <- length(x$beta)
+    subpop.names <- names(x$beta)
+    dimensions   <- sapply(x$beta, ncol)
+
+    maxd <- max(dimensions)
+    par(mfrow = c(n.subpops, maxd))
+
+    rbPal <- colorRampPalette(c('red','blue'))
+
+    for (s in 1:n.subpops)
+    {
+        for (d in 1:maxd)
+        {
+            if (d <= dimensions[s])
+            {
+                col.use <- "#000000BF"
+                if (dimensions[s] == 2)
+                {
+                    nc <- 12
+                    if (d == 1)
+                    {
+                        col.use <- rbPal(nc)[as.numeric(cut(x$directions[[s]][,2],
+                                                            breaks = nc))]
+                    } else
+                    {
+                        col.use <- rbPal(nc)[as.numeric(cut(x$directions[[s]][,1],
+                                                            breaks = nc))]
+                    }
+
+                }
+                plot(x = x$directions[[s]][,d],
+                     y = x$y.list[[s]], xlab = paste0("x * beta[", s, ",", d, "]"),
+                     ylab = paste0("Y[", subpop.names[s], "]"),
+                     pch = 19, col = col.use)
+            } else
+            {
+                plot.new()
+            }
+        }
+    }
+
+}
+
+
+
 
