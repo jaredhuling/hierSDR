@@ -928,9 +928,90 @@ hier.sphd <- function(x, y, z, z.combinations, d,
         lhs / sum(weights)
     }
 
+
+    # not used because it really doesn't work well
+    est.eqn.by.component <- function(component.vec, nn.val, s.idx, beta.vec, optimize.nn = FALSE)
+    {
+        optimize.nn  <- FALSE
+        cumul.params <- c(0, cumsum(d * p - d ^ 2))
+
+        if (d[s.idx] > 0)
+        {
+            vec.idx <- (cumul.params[s] + 1):cumul.params[s + 1]
+            beta.vec[vec.idx] <- component.vec
+        }
+
+        if (optimize.nn)
+        {
+            beta.mat.list  <- vec2subpopMatsId(beta.vec[-1], p, d, z.combinations)
+        } else
+        {
+            beta.mat.list  <- vec2subpopMatsId(beta.vec, p, d, z.combinations)
+        }
+
+        Ey.given.xbeta <- numeric(nobs)
+
+        if (length(nn.val) == 1)
+        {
+            nn.val <- rep(nn.val, length(beta.mat.list))
+        }
+
+
+
+        for (s in 1:n.combinations)
+        {
+            strata.idx <- strat.idx.list[[s]]
+            dir.cur    <- x.tilde[[s]] %*% beta.mat.list[[s]]
+
+            # remove any directions with no variation.
+            # probably not needed, but just in case
+            dir.cur    <- dir.cur[,which(apply(dir.cur, 2, sd) != 0), drop = FALSE]
+
+            sd <- sd(dir.cur)
+
+            best.h <- sd * (0.75 * nrow(dir.cur)) ^ (-1 / (ncol(dir.cur) + 4) )
+
+            if (optimize.nn)
+            {
+                locfit.mod <- locfit.raw(x = dir.cur, y = y.list[[s]],
+                                         kern = "trwt", kt = "prod",
+                                         alpha = c(exp(beta.vec[1]) / (1 + exp(beta.vec[1])), best.h), deg = 2, ...)
+            } else
+            {
+                locfit.mod <- locfit.raw(x = dir.cur, y = y.list[[s]],
+                                         kern = "trwt", kt = "prod",
+                                         alpha = c(nn.val[s], best.h), deg = 2, ...)
+            }
+
+            # locfit.mod <- locfit.raw(x = dir.cur, y = y[strata.idx],
+            #                          kern = "trwt", kt = "prod",
+            #                          alpha = best.h, deg = 2, ...)
+
+            Ey.given.xbeta[strata.idx] <- fitted(locfit.mod)
+        }
+
+
+
+        lhs   <- sum(unlist(lapply(1:length(x.tilde), function(i) {
+            strata.idx <- strat.idx.list[[i]]
+            resid      <- drop(y.list[[i]] - Ey.given.xbeta[strata.idx])
+            wts.cur    <- weights.list[[i]]
+            norm(crossprod(x.tilde[[i]], (wts.cur * resid) * x.tilde[[i]]), type = "F") ^ 2
+        })))
+        lhs / sum(weights)
+    }
+
     est.eqn.grad <- function(beta.vec, nn.val, optimize.nn = FALSE)
     {
         grad.full     <- grad(est.eqn, beta.vec, method = "simple", nn.val = nn.val, optimize.nn = optimize.nn)
+        if (verbose > 1) cat("grad norm: ", sqrt(sum(grad.full ^ 2)), "\n")
+        grad.full
+    }
+
+    est.eqn.by.component.grad <- function(component.vec, nn.val, s.idx, beta.vec, optimize.nn = FALSE)
+    {
+        grad.full     <- grad(est.eqn.by.component, component.vec, method = "simple", nn.val = nn.val,
+                              s.idx = s.idx, beta.vec = beta.vec, optimize.nn = optimize.nn)
         if (verbose > 1) cat("grad norm: ", sqrt(sum(grad.full ^ 2)), "\n")
         grad.full
     }
@@ -1095,6 +1176,7 @@ hier.sphd <- function(x, y, z, z.combinations, d,
     {
         if (init.method == "random") init <- init.rand
     }
+
 
     slver <- opt.est.eqn(init         = init,
                          est.eqn      = est.eqn,
