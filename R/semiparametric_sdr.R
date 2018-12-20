@@ -196,7 +196,10 @@ semi.phd <- function(x, y, d = 5L, maxit = 10L, h = NULL,
                                     "nlminb",
                                     "newuoa"),
                      nn = NULL,
+                     init.method = c("random", "phd"),
                      optimize.nn = FALSE, verbose = TRUE,
+                     n.samples = 100,
+                     degree = 2,
                      vic = FALSE, B = NULL, ...)
 {
     cov <- cov(x)
@@ -206,19 +209,44 @@ semi.phd <- function(x, y, d = 5L, maxit = 10L, h = NULL,
     eigvals <- eig.cov$values
     eigvals[eigvals <= 0] <- 1e-5
 
+    init.method <- match.arg(init.method)
+
     sqrt.inv.cov <- eig.cov$vectors %*% diag(1 / sqrt(eigvals)) %*% t(eig.cov$vectors)
     x.tilde <- scale(x, scale = FALSE) %*% sqrt.inv.cov
 
+
+
     V.hat <- crossprod(x.tilde, drop(scale(y, scale = FALSE)) * x.tilde) / nrow(x.tilde)
     eig.V <- eigen(V.hat)
-    beta.init  <- eig.V$vectors[,1:d,drop=FALSE]
+    beta.init <- eig.V$vectors[,1:d,drop=FALSE]
+
+    beta.init <- grassmannify(beta.init)$beta
+
+    #beta.init <- grassmannify(dr(y ~ x.tilde, method = "phd")$evectors[, 1:d, drop = FALSE])$beta
+
+    # xb1 <- x.tilde %*% beta.init
+    #
+    # lm1 <- lm(y ~ x.tilde)
+    #
+    # sdd <- sd(xb1)
+    #
+    # best.hh <- sdd * (0.75 * nrow(xb1)) ^ (-1 / (ncol(xb1) + 4) )
+    #
+    # locfit.mod <- locfit.raw(x = xb1, y = y,
+    #                          kern = "trwt", kt = "prod",
+    #                          alpha = c(0.1, best.hh), deg = degree, ...)
+    # ypred <- unname(fitted(locfit.mod))
+    #
+    # V.hat <- crossprod(x.tilde, drop(scale(y - ypred, scale = FALSE)) * x.tilde) / nrow(x.tilde)
+    # eig.V <- eigen(V.hat)
+    # beta.init  <- eig.V$vectors[,1:d,drop=FALSE]
 
     if (is.null(h))
     {
         h <- exp(seq(log(0.5), log(25), length.out = 25))
     }
     directions <- x.tilde %*% beta.init
-    gcv.vals   <- sapply(h, function(hv) gcv(x = directions, y = y, alpha = hv, deg = 3, ...)[4])
+    gcv.vals   <- sapply(h, function(hv) gcv(x = directions, y = y, alpha = hv, deg = degree, ...)[4])
     best.h.init     <- h[which.min(gcv.vals)]
 
     est.eqn <- function(beta.vec, nn.val, optimize.nn = FALSE)
@@ -244,12 +272,12 @@ semi.phd <- function(x, y, d = 5L, maxit = 10L, h = NULL,
         {
             locfit.mod <- locfit.raw(x = directions, y = y,
                                      kern = "trwt", kt = "prod",
-                                     alpha = c(exp(beta.vec[1]) / (1 + exp(beta.vec[1])), best.h), deg = 2, ...)
+                                     alpha = c(exp(beta.vec[1]) / (1 + exp(beta.vec[1])), best.h), deg = degree, ...)
         } else
         {
             locfit.mod <- locfit.raw(x = directions, y = y,
                                      kern = "trwt", kt = "prod",
-                                     alpha = c(nn.val, best.h), deg = 2, ...)
+                                     alpha = c(nn.val, best.h), deg = degree, ...)
         }
 
 
@@ -275,7 +303,7 @@ semi.phd <- function(x, y, d = 5L, maxit = 10L, h = NULL,
 
         locfit.mod <- locfit.raw(x = directions, y = y,
                                  kern = "trwt", kt = "prod",
-                                 alpha = c(nn.val, best.h), deg = 2, ...)
+                                 alpha = c(nn.val, best.h), deg = degree, ...)
 
 
         Ey.given.xbeta <- fitted(locfit.mod)
@@ -310,7 +338,7 @@ semi.phd <- function(x, y, d = 5L, maxit = 10L, h = NULL,
 
     est.eqn.grad <- function(beta.vec, nn.val, optimize.nn = FALSE)
     {
-        grad.full     <- grad(est.eqn, beta.vec, method = "simple", nn.val = nn.val, optimize.nn = optimize.nn)
+        grad.full     <- numDeriv::grad(est.eqn, beta.vec, method = "simple", nn.val = nn.val, optimize.nn = optimize.nn)
         if (verbose) cat("grad norm: ", sqrt(sum(grad.full ^ 2)), "\n")
         grad.full
     }
@@ -334,6 +362,9 @@ semi.phd <- function(x, y, d = 5L, maxit = 10L, h = NULL,
     #  beta[(d+1):nrow(beta),]
 
     init <- rep(1, length(as.vector(beta.init[(d+1):nrow(beta.init),])) )
+
+
+
 
 
     #slver <- BBoptim(par = init,
@@ -369,22 +400,98 @@ semi.phd <- function(x, y, d = 5L, maxit = 10L, h = NULL,
 
     init <- as.vector(beta.init[-(1:ncol(beta.init)),])
 
+
+    npar <- length(init)
+
+    if (init.method == "random")
+    {
+
+        best.value <- 1e99
+
+        nn.vals <- c(0.15, 0.25, 0.5, 0.75, 0.9, 0.95)
+        for (tr in 1:n.samples)
+        {
+            par.cur <- runif(npar, min = min(init), max = max(init))
+
+            values.cur <- numeric(length(nn.vals))
+            for (i in 1:length(nn.vals) )
+            {
+                nh <- nn.vals[i]
+                values.cur[i] <- est.eqn(par.cur, nn.val = nh)
+            }
+
+            value.cur <- min(values.cur)
+            if (value.cur < best.value)
+            {
+                best.value <- value.cur
+                best.par   <- par.cur
+            }
+        }
+        init.rand <- best.par
+
+        #init <- init.rand
+    }
+
+
+    # test which nn values minimize the most effectively
+    # if (is.null(nn))
+    # {
+    #     tryval <- try.nn(nn.vals      = c(0.1, 0.25, 0.5, 0.75, 0.9, 0.95),
+    #                  init         = init,
+    #                  est.eqn      = est.eqn,
+    #                  est.eqn.grad = est.eqn.grad,
+    #                  opt.method   = opt.method,
+    #                  optimize.nn  = optimize.nn,
+    #                  maxit        = 10L,
+    #                  verbose      = verbose)
+    #
+    #     nn   <- tryval$nn
+    #     init <- tryval$par
+    #
+    #     if (verbose) print(paste("best nn:", nn))
+    # }
+    #
+
+
     # test which nn values minimize the most effectively
     if (is.null(nn))
     {
         tryval <- try.nn(nn.vals      = c(0.1, 0.25, 0.5, 0.75, 0.9, 0.95),
-                     init         = init,
-                     est.eqn      = est.eqn,
-                     est.eqn.grad = est.eqn.grad,
-                     opt.method   = opt.method,
-                     optimize.nn  = optimize.nn,
-                     maxit        = 10L,
-                     verbose      = verbose)
-
+                         init         = init,
+                         est.eqn      = est.eqn,
+                         est.eqn.grad = est.eqn.grad,
+                         opt.method   = opt.method,
+                         optimize.nn  = optimize.nn,
+                         maxit        = 10L,
+                         verbose      = verbose)
         nn   <- tryval$nn
         init <- tryval$par
 
+
+        if (init.method == "random")
+        {
+            tryval2 <- try.nn(nn.vals      = c(0.1, 0.25, 0.5, 0.75, 0.9, 0.95),
+                              init         = init.rand,
+                              est.eqn      = est.eqn,
+                              est.eqn.grad = est.eqn.grad,
+                              opt.method   = opt.method,
+                              optimize.nn  = optimize.nn,
+                              maxit        = 10L,
+                              verbose      = verbose)
+            nn2   <- tryval2$nn
+            init2 <- tryval2$par
+
+            if (tryval$value > tryval2$value)
+            {
+                init <- init2
+                nn   <- nn2
+            }
+        }
+
         if (verbose) print(paste("best nn:", nn))
+    } else
+    {
+        if (init.method == "random") init <- init.rand
     }
 
     slver <- opt.est.eqn(init         = init,

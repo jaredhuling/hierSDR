@@ -477,4 +477,11 @@ createAboveList <- function(combin.mat)
     above.idx.list
 }
 
+grassmannify <- function(mat)
+{
+    dims <- dim(mat)
+    proj = t(mat[1:dims[2],,drop=FALSE]) %*% solve(tcrossprod(mat[1:dims[2],,drop=FALSE]))
+    list(beta = mat %*% proj, proj = proj)
+}
+
 

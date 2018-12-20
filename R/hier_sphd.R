@@ -620,7 +620,7 @@ semi.phd.hier.newton <- function(x.list, y, d = rep(1L, 3L),
 
             model.list[[m]] <- locfit.raw(x = dir.cur, y = y[strata.idx],
                                           kern = "trwt", kt = "prod",
-                                          alpha = c(nn, best.h), deg = 2, ...)
+                                          alpha = c(nn, best.h), deg = degree, ...)
 
             fitted.vals <- fitted(model.list[[m]])
 
@@ -673,6 +673,7 @@ hier.sphd <- function(x, y, z, z.combinations, d,
                                      "newuoa"),
                       init.method           = c("random", "phd"),
                       vic                   = TRUE,     # should the VIC be calculated?
+                      vic.free.params       = FALSE,
                       grassmann             = TRUE,     # constrain parameters to the Grassmann manifold?
                       nn                    = NULL,     # nn fraction. Will be chosen automatically if nn = NULL
                       nn.try                = c(0.15, 0.25, 0.5, 0.75, 0.9, 0.95), # values to try if nn = NULL (more values takes longer)
@@ -681,6 +682,8 @@ hier.sphd <- function(x, y, z, z.combinations, d,
                       calc.mse              = FALSE,    # should the MSE of each subpop model be calculated after fitting?
                       constrain.none.subpop = FALSE,    # should we constrain S_{none} \subseteq S_{M} for all M?
                       verbose               = TRUE,     # should messages be printed out during optimization?
+                      degree                = 2,        # degree of kernel
+                      pooled                = FALSE,
                       ...)
 {
 
@@ -757,6 +760,8 @@ hier.sphd <- function(x, y, z, z.combinations, d,
         scale(x.list[[i]], scale = FALSE) %*% sqrt.inv.cov[[i]]# / sqrt(nobs.vec[i])
     })
 
+    x.tilde.tall <- do.call(rbind, x.tilde)
+
 
     # construct linear constraint matrices
     constraints <- vector(mode = "list", length = nrow(z.combinations))
@@ -775,7 +780,8 @@ hier.sphd <- function(x, y, z, z.combinations, d,
         {
             if (hasAllConds(z.combinations[i,], z.combinations[cr,]) & !(!constrain.none.subpop & all(z.combinations[cr,] == 0)))
             { # if the ith subpopulation is nested within the one indexed by 'cr'
-                # then we apply equality constraints (but only if it's not the none subpop (unless we want to constrain the none subpop))
+                # then we apply equality constraints (but only if it's not the none subpop
+                # (unless we want to constrain the none subpop))
 
                 constr.idx <- rep(0, nrow(z.combinations))
                 constr.idx[c(cr, i)] <- c(1, -1)
@@ -817,8 +823,18 @@ hier.sphd <- function(x, y, z, z.combinations, d,
 
     V.hat    <- crossprod(x.tilde.b, drop(scale(y, scale = FALSE)) * x.tilde.b) / nrow(x.tilde.b)
 
+    #V.hat.us    <- crossprod(x.big, drop(scale(y, scale = FALSE)) * x.big) / nrow(x.big)
+
 
     beta.list <- beta.init.list <- Proj.constr.list <- vector(mode = "list", length = length(constraints))
+
+    #qrlist <- lapply(1:length(x.list), function(i) {
+    #    qr(scale(x.list[[i]], scale = FALSE))
+    #})
+
+    #qr.b <- qr(scale(x.big, scale = FALSE))
+
+    #qrz <- qr(scale(x, center=TRUE, scale=FALSE))
 
 
     for (c in 1:length(constraints))
@@ -830,9 +846,36 @@ hier.sphd <- function(x, y, z, z.combinations, d,
 
             Proj.constr.list[[c]] <- diag(ncol(Pc)) - Pc
 
-            eig.c          <- eigen(Proj.constr.list[[c]] %*% V.hat )
-            eta.hat        <- eig.c$vectors[,1:d[c], drop=FALSE]
-            beta.list[[c]] <- Re(eta.hat)
+            #eig.c          <- eigen(Proj.constr.list[[c]] %*% V.hat )
+            #eta.hat        <- eig.c$vectors[,1:d[c], drop=FALSE]
+
+            #real.eta <- Re(eta.hat)
+
+
+            D          <- eigen(Proj.constr.list[[c]] %*% V.hat )
+
+            or <- rev(order(abs(D$values)))
+            evalues <- D$values[or]
+            raw.evectors <- Re(D$vectors[,or])
+
+            qr_R <- function(object)
+            {
+                qr.R(object)[1:object$rank,1:object$rank]
+            }
+
+            # evectors <- backsolve(sqrt(nrow(x.big))*qr_R(qr.b),raw.evectors)
+            # evectors <- if (is.matrix(evectors)) evectors else matrix(evectors,ncol=1)
+            # evectors <- apply(evectors,2,function(x) x/sqrt(sum(x^2)))
+
+            #real.eta <- Re(raw.evectors[,1:d[c], drop=FALSE])
+            real.eta <- Re(raw.evectors[,1:d[c], drop=FALSE])
+
+            whichzero <- apply(real.eta, 2, function(cl) all(abs(cl) <= 1e-12))
+
+            #print((real.eta[,!whichzero,drop=FALSE]))
+            #real.eta[,!whichzero] <- grassmannify(real.eta[,!whichzero,drop=FALSE])$beta
+
+            beta.list[[c]] <- real.eta
         }
     }
 
@@ -846,15 +889,29 @@ hier.sphd <- function(x, y, z, z.combinations, d,
     num.strata    <- length(unique.strata)
 
     beta.component.init <- beta.list
+    ct <- 0
+
     for (s in 1:length(beta.list))
     {
-        beta.component.init[[s]] <- beta.list[[s]][(p * (s - 1) + 1):(p * s),,drop = FALSE]
+        if (d[s] > 0)
+        {
+            beta.component.init[[s]] <- beta.list[[s]][(p * (s - 1) + 1):(p * s),,drop = FALSE]
+            #beta.component.init[[s]] <- beta.list[[s]][(p * (s - 1) + 1):(p * s),,drop = FALSE]
+        }
     }
 
     beta.component.init <- lapply(beta.component.init, function(bb) {
         if (!is.null(bb))
         {
             nc <- ncol(bb)
+
+            whichzero <- apply(bb, 2, function(cl) all(abs(cl) <= 1e-12))
+
+            #print((bb[,!whichzero,drop=FALSE]))
+            #bb[,!whichzero] <- grassmannify(bb[,!whichzero,drop=FALSE])$beta
+
+
+            bb <- grassmannify(bb)$beta
             bb[(nc + 1):nrow(bb),]
         } else
         {
@@ -864,7 +921,15 @@ hier.sphd <- function(x, y, z, z.combinations, d,
 
     init <- unlist(beta.component.init)
 
+    txpy.list <- vector(mode = "list", length = n.combinations)
+    for (s in 1:n.combinations)
+    {
+        txpy.list[[s]] <- vector(mode = "list", length = NROW(x.tilde[[s]]))
+        for (j in 1:NROW(x.tilde[[s]])) txpy.list[[s]][[j]] <- tcrossprod(x.tilde[[s]][j,])
+    }
 
+
+    ncuts <- 3
 
     est.eqn <- function(beta.vec, nn.val, optimize.nn = FALSE)
     {
@@ -884,6 +949,10 @@ hier.sphd <- function(x, y, z, z.combinations, d,
         }
 
 
+        resid.Exxt.given.x.beta <- vector(mode = "list", length = nobs)
+
+
+        Ey.given.xbeta.list <- vector(mode = "list", length = n.combinations)
 
         for (s in 1:n.combinations)
         {
@@ -902,30 +971,48 @@ hier.sphd <- function(x, y, z, z.combinations, d,
             {
                 locfit.mod <- locfit.raw(x = dir.cur, y = y.list[[s]],
                                          kern = "trwt", kt = "prod",
-                                         alpha = c(exp(beta.vec[1]) / (1 + exp(beta.vec[1])), best.h), deg = 2, ...)
+                                         alpha = c(exp(beta.vec[1]) / (1 + exp(beta.vec[1])), best.h), deg = degree, ...)
             } else
             {
                 locfit.mod <- locfit.raw(x = dir.cur, y = y.list[[s]],
                                          kern = "trwt", kt = "prod",
-                                         alpha = c(nn.val[s], best.h), deg = 2, ...)
+                                         alpha = c(nn.val[s], best.h), deg = degree, ...)
             }
 
             # locfit.mod <- locfit.raw(x = dir.cur, y = y[strata.idx],
             #                          kern = "trwt", kt = "prod",
             #                          alpha = best.h, deg = 2, ...)
 
+
             Ey.given.xbeta[strata.idx] <- fitted(locfit.mod)
+            Ey.given.xbeta.list[[s]]   <- Ey.given.xbeta[strata.idx]
+            #nws <- nwcov(dir.cur, x = x.tilde[[s]], txpy.list = txpy.list[[s]], h = 0.25, max.points = 500, ncuts = ncuts)
+            #resid.Exxt.given.x.beta[strata.idx] <- nws$resid
         }
 
 
 
-        lhs   <- sum(unlist(lapply(1:length(x.tilde), function(i) {
-            strata.idx <- strat.idx.list[[i]]
-            resid      <- drop(y.list[[i]] - Ey.given.xbeta[strata.idx])
-            wts.cur    <- weights.list[[i]]
-            norm(crossprod(x.tilde[[i]], (wts.cur * resid) * x.tilde[[i]]), type = "F") ^ 2
-        })))
-        lhs / sum(weights)
+        if (pooled)
+        {
+            resid      <- drop(unlist(y.list)) - drop(unlist(Ey.given.xbeta.list))
+            return(norm(crossprod(x.tilde.tall, (weights * resid) * x.tilde.tall), type = "F") ^ 2 / sum(weights))
+        } else
+        {
+            lhs   <- sum(unlist(lapply(1:length(x.tilde), function(i) {
+                strata.idx <- strat.idx.list[[i]]
+                resid      <- drop(y.list[[i]] - Ey.given.xbeta[strata.idx])
+                wts.cur    <- weights.list[[i]]
+
+                # lhss <- 0
+                # for (j in 1:length(strata.idx))
+                # {
+                #     lhss <- lhss + sum((resid.Exxt.given.x.beta[[strata.idx[j]]] * resid[j]) ^ 2)
+                # }
+                # lhss
+                norm(crossprod(x.tilde[[i]], (wts.cur * resid) * x.tilde[[i]]), type = "F") ^ 2
+            })))
+            return(lhs / sum(weights))
+        }
     }
 
 
@@ -957,6 +1044,7 @@ hier.sphd <- function(x, y, z, z.combinations, d,
         }
 
 
+        Ey.given.xbeta.list <- vector(mode = "list", length = n.combinations)
 
         for (s in 1:n.combinations)
         {
@@ -975,12 +1063,12 @@ hier.sphd <- function(x, y, z, z.combinations, d,
             {
                 locfit.mod <- locfit.raw(x = dir.cur, y = y.list[[s]],
                                          kern = "trwt", kt = "prod",
-                                         alpha = c(exp(beta.vec[1]) / (1 + exp(beta.vec[1])), best.h), deg = 2, ...)
+                                         alpha = c(exp(beta.vec[1]) / (1 + exp(beta.vec[1])), best.h), deg = degree, ...)
             } else
             {
                 locfit.mod <- locfit.raw(x = dir.cur, y = y.list[[s]],
                                          kern = "trwt", kt = "prod",
-                                         alpha = c(nn.val[s], best.h), deg = 2, ...)
+                                         alpha = c(nn.val[s], best.h), deg = degree, ...)
             }
 
             # locfit.mod <- locfit.raw(x = dir.cur, y = y[strata.idx],
@@ -988,29 +1076,44 @@ hier.sphd <- function(x, y, z, z.combinations, d,
             #                          alpha = best.h, deg = 2, ...)
 
             Ey.given.xbeta[strata.idx] <- fitted(locfit.mod)
+            Ey.given.xbeta.list[[s]]   <- Ey.given.xbeta[strata.idx]
         }
 
 
 
-        lhs   <- sum(unlist(lapply(1:length(x.tilde), function(i) {
-            strata.idx <- strat.idx.list[[i]]
-            resid      <- drop(y.list[[i]] - Ey.given.xbeta[strata.idx])
-            wts.cur    <- weights.list[[i]]
-            norm(crossprod(x.tilde[[i]], (wts.cur * resid) * x.tilde[[i]]), type = "F") ^ 2
-        })))
-        lhs / sum(weights)
+        if (pooled)
+        {
+            resid      <- drop(y) - drop(unlist(Ey.given.xbeta.list))
+            return(norm(crossprod(x.tilde.tall, (weights * resid) * x.tilde.tall), type = "F") ^ 2 / sum(weights))
+        } else
+        {
+            lhs   <- sum(unlist(lapply(1:length(x.tilde), function(i) {
+                strata.idx <- strat.idx.list[[i]]
+                resid      <- drop(y.list[[i]] - Ey.given.xbeta[strata.idx])
+                wts.cur    <- weights.list[[i]]
+
+                # lhss <- 0
+                # for (j in 1:length(strata.idx))
+                # {
+                #     lhss <- lhss + sum((resid.Exxt.given.x.beta[[strata.idx[j]]] * resid[j]) ^ 2)
+                # }
+                # lhss
+                norm(crossprod(x.tilde[[i]], (wts.cur * resid) * x.tilde[[i]]), type = "F") ^ 2
+            })))
+            return(lhs / sum(weights))
+        }
     }
 
     est.eqn.grad <- function(beta.vec, nn.val, optimize.nn = FALSE)
     {
-        grad.full     <- grad(est.eqn, beta.vec, method = "simple", nn.val = nn.val, optimize.nn = optimize.nn)
+        grad.full     <- numDeriv::grad(est.eqn, beta.vec, method = "simple", nn.val = nn.val, optimize.nn = optimize.nn)
         if (verbose > 1) cat("grad norm: ", sqrt(sum(grad.full ^ 2)), "\n")
         grad.full
     }
 
     est.eqn.by.component.grad <- function(component.vec, nn.val, s.idx, beta.vec, optimize.nn = FALSE)
     {
-        grad.full     <- grad(est.eqn.by.component, component.vec, method = "simple", nn.val = nn.val,
+        grad.full     <- numDeriv::grad(est.eqn.by.component, component.vec, method = "simple", nn.val = nn.val,
                               s.idx = s.idx, beta.vec = beta.vec, optimize.nn = optimize.nn)
         if (verbose > 1) cat("grad norm: ", sqrt(sum(grad.full ^ 2)), "\n")
         grad.full
@@ -1029,6 +1132,8 @@ hier.sphd <- function(x, y, z, z.combinations, d,
             nn.val <- rep(nn.val, length(beta.mat.list))
         }
 
+        Ey.given.xbeta.list <- vector(mode = "list", length = n.combinations)
+
         for (s in 1:n.combinations)
         {
             strata.idx <- strat.idx.list[[s]]
@@ -1044,21 +1149,38 @@ hier.sphd <- function(x, y, z, z.combinations, d,
 
             locfit.mod <- locfit.raw(x = dir.cur, y = y.list[[s]],
                                      kern = "trwt", kt = "prod",
-                                     alpha = c(nn.val[s], best.h), deg = 2, ...)
+                                     alpha = c(nn.val[s], best.h), deg = degree, ...)
 
 
 
             Ey.given.xbeta[strata.idx] <- fitted(locfit.mod)
+            Ey.given.xbeta.list[[s]]   <- Ey.given.xbeta[strata.idx]
         }
 
 
-        lhs   <- sum(unlist(lapply(1:n.combinations, function(i) {
-            strata.idx <- strat.idx.list[[i]]
-            resid      <- drop(y.list[[i]] - Ey.given.xbeta[strata.idx])
-            wts.cur    <- weights.list[[i]]
-            norm(crossprod(x.tilde[[i]], (wts.cur * resid) * x.tilde[[i]]), type = "F") ^ 2
-        })))
-        lhs / sum(weights)
+        # lhs   <- sum(unlist(lapply(1:n.combinations, function(i) {
+        #     strata.idx <- strat.idx.list[[i]]
+        #     resid      <- drop(y.list[[i]] - Ey.given.xbeta[strata.idx])
+        #     wts.cur    <- weights.list[[i]]
+        #     norm(crossprod(x.tilde[[i]], (wts.cur * resid) * x.tilde[[i]]), type = "F") ^ 2
+        # })))
+        # lhs / sum(weights)
+
+        if (pooled)
+        {
+            resid      <- drop(y) - drop(unlist(Ey.given.xbeta.list))
+            return(norm(crossprod(x.tilde.tall, (weights * resid) * x.tilde.tall), type = "F") ^ 2 / sum(weights))
+        } else
+        {
+            lhs   <- sum(unlist(lapply(1:length(x.tilde), function(i) {
+                strata.idx <- strat.idx.list[[i]]
+                resid      <- drop(y.list[[i]] - Ey.given.xbeta[strata.idx])
+                wts.cur    <- weights.list[[i]]
+
+                norm(crossprod(x.tilde[[i]], (wts.cur * resid) * x.tilde[[i]]), type = "F") ^ 2
+            })))
+            return(lhs / sum(weights))
+        }
     }
 
 
@@ -1102,7 +1224,7 @@ hier.sphd <- function(x, y, z, z.combinations, d,
         beta.list.phd <- beta.list.tmp <- beta.list
         best.value <- 1e99
 
-        nn.vals <- c(0.15, 0.25, 0.5, 0.75, 0.9, 0.95)
+        nn.vals <- c(0.05, 0.15, 0.25, 0.5, 0.75, 0.9, 0.95)
         for (tr in 1:n.samples)
         {
             par.cur <- runif(npar, min = min(init), max = max(init))
@@ -1128,7 +1250,7 @@ hier.sphd <- function(x, y, z, z.combinations, d,
 
 
 
-
+    #init <- rnorm(length(init))
 
 
 
@@ -1199,15 +1321,28 @@ hier.sphd <- function(x, y, z, z.combinations, d,
                       est.eqn.vic(slver$par, nn.val = nn, v = 1))
 
         vic.eqn <- mean(vic.eqns)
-        vic1    <- vic.eqn       + log(sum(nobs.vec)) * nvars * (sum(sapply(beta.mat.list, ncol)))
-        vic3    <- min(vic.eqns) + log(sum(nobs.vec)) * nvars * (sum(sapply(beta.mat.list, ncol)))
+        if (vic.free.params)
+        {
+            vic1    <- vic.eqn       + log(sum(nobs.vec)) * length(slver$par)
+            vic3    <- min(vic.eqns) + log(sum(nobs.vec)) * length(slver$par)
+        } else
+        {
+            vic1    <- vic.eqn       + log(sum(nobs.vec)) * nvars * (sum(sapply(beta.mat.list, ncol)))
+            vic3    <- min(vic.eqns) + log(sum(nobs.vec)) * nvars * (sum(sapply(beta.mat.list, ncol)))
+        }
     } else
     {
         vic.eqns <- vic.eqn <- vic3 <- NULL
     }
 
+    if (vic.free.params)
+    {
+        vic2 <- slver$value   + log(sum(nobs.vec)) * length(slver$par)
+    } else
+    {
+        vic2 <- slver$value   + log(sum(nobs.vec)) * nvars * (sum(sapply(beta.mat.list, ncol)))
+    }
 
-    vic2 <- slver$value   + log(sum(nobs.vec)) * nvars * (sum(sapply(beta.mat.list, ncol)))
 
 
     model.list <- vector(mode = "list", length = 3)
