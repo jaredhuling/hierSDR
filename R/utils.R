@@ -168,17 +168,17 @@ subpopMats2components <- function(mat.list, p, d, cond.mat, incl.none = FALSE)
     nnz             <- sum(d > 0)
     component.list  <- vector(mode = "list", length = n.subpops)
 
-    BelowList      <- createBelowList(cond.mat)
+    BelowList       <- createBelowList(cond.mat)
 
     cumul.params    <- c(0, cumsum(d * p))
-    for (s in 1:n.subpops)
-    {
-        if (d[s] > 0)
-        {
-            vec.idx <- (cumul.params[s] + 1):cumul.params[s + 1]
-            component.list[[s]] <- matrix(vec[vec.idx], ncol = d[s])
-        }
-    }
+    # for (s in 1:n.subpops)
+    # {
+    #     if (d[s] > 0)
+    #     {
+    #         vec.idx <- (cumul.params[s] + 1):cumul.params[s + 1]
+    #         component.list[[s]] <- matrix(vec[vec.idx], ncol = d[s])
+    #     }
+    # }
 
     BelowListCols <- lapply(BelowList, function(mt) {
         vl <- NULL

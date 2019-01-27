@@ -202,9 +202,9 @@ hier.sphd <- function(x, y, z, z.combinations, d,
 
     }
 
-    strat.id <- unlist(lapply(1:length(x.list), function(id) rep(id, nrow(x.list[[id]]))))
+    strat.id  <- unlist(lapply(1:length(x.list), function(id) rep(id, nrow(x.list[[id]]))))
 
-    V.hat    <- crossprod(x.tilde.b, drop(scale(y, scale = FALSE)) * x.tilde.b) / nrow(x.tilde.b)
+    V.hat     <- crossprod(x.tilde.b, drop(scale(y, scale = FALSE)) * x.tilde.b) / nrow(x.tilde.b)
 
     beta.list <- beta.init.list <- Proj.constr.list <- vector(mode = "list", length = length(constraints))
 
