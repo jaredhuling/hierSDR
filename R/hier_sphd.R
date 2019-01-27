@@ -37,14 +37,11 @@
 #' @param degree degree of kernel to use
 #' @param pooled should the estimator be a pooled estimator?
 #' @param ... extra arguments passed to \code{\link[locfit]{locfit.raw}}
-#' @seealso \code{\link[hierSDR]{hier.sphd}} for function which fits hierarchical SDR model
-#' @rdname plot
-#'
+#' @export
 #' @examples
 #'
 #' library(hierSDR)
 #'
-#' @export
 hier.sphd <- function(x, y, z, z.combinations, d,
                       weights = rep(1L, NROW(y)),
                       maxit = 250L,
@@ -730,12 +727,11 @@ hier.sphd <- function(x, y, z, z.combinations, d,
 #' @param ... not used
 #' @seealso \code{\link[hierSDR]{hier.sphd}} for function which fits hierarchical SDR model
 #' @rdname plot
-#'
+#' @export
 #' @examples
 #'
 #' library(hierSDR)
 #'
-#' @export
 plot.hier_sdr_fit <- function(x, ...)
 {
     n.subpops    <- length(x$beta)

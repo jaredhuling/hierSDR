@@ -9,7 +9,7 @@ angle(B1, B2)
 \arguments{
 \item{B1}{first matrix}
 
-\item{B1}{second matrix}
+\item{B2}{second matrix}
 }
 \description{
 Measures angle between two subspaces

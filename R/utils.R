@@ -500,15 +500,14 @@ Proj <- function(b) b %*% solve(crossprod(b), t(b))
 #' Norm of difference of projections
 #' @description Measures distance between two subspaces
 #' @param B1 first matrix
-#' @param B1 second matrix
-#' @export proj.norm
-#' @usage proj.norm(B1, B2)
+#' @param B2 second matrix
+#' @export projnorm
 #' @examples
 #' b1 <- matrix(rnorm(10 * 2), ncol = 2)
 #' b2 <- matrix(rnorm(10 * 2), ncol = 2)
-#' proj.norm(b1, b2)
+#' projnorm(b1, b2)
 #'
-proj.norm <- function(B1, B2)
+projnorm <- function(B1, B2)
 {
     norm(Proj(B1) - Proj(B2), type = "F")
 }
@@ -517,7 +516,7 @@ proj.norm <- function(B1, B2)
 #' @description Measures angle between two subspaces
 #'  from http://www4.stat.ncsu.edu/~li/software/GroupDR.R
 #' @param B1 first matrix
-#' @param B1 second matrix
+#' @param B2 second matrix
 #' @export
 #' @examples
 #' b1 <- matrix(rnorm(10 * 2), ncol = 2)

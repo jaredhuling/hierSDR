@@ -3,91 +3,91 @@ Kepanechnikov  <- function(u) 0.75 * (1 - (u) ^ 2) * (abs(u) < 1)
 Kepanechnikov2 <- function(u) 0.75 * (1 - (u) ^ 2)
 
 
-nwsmooth <- function(x, y, h = 1, max.points = 100)
-{
-    nobs        <- NROW(x)
-    dist.idx    <- fields.rdist.near(x, x, h, max.points = nobs * max.points)
-    dist.idx$ra <- Kepanechnikov2(dist.idx$ra / h)
-    diffmat     <- sparseMatrix(dist.idx$ind[,1], dist.idx$ind[,2],
-                                x = dist.idx$ra,  dims = dist.idx$da)
-    #diffmat@x   <- Kepanechnikov2(diffmat@x)# / h
-
-    RSS <- sum(((Diagonal(nobs) - diffmat) %*% y)^2)/nobs
-    predicted.values <- Matrix::colSums(y * diffmat) / Matrix::colSums(diffmat)
-    trS <- sum(Matrix::diag(diffmat))
-    #gcv <- (1 / nobs) * sum(( (y - predicted.values) / (1 - trS / nobs) ) ^ 2)
-    gcv <- RSS / ((1 - trS / nobs) ) ^ 2
-    list(fitted = predicted.values, gcv = gcv)
-}
-
-
-nwsmoothcov <- function(directions, x, h = 1, max.points = 100, ret.xtx = FALSE)
-{
-    nobs <- NROW(directions)
-    dist.idx    <- fields.rdist.near(directions, directions, h,
-                                     max.points = nobs * max.points)
-    dist.idx$ra <- Kepanechnikov2(dist.idx$ra / h)
-    diffmat     <- sparseMatrix(dist.idx$ind[,1], dist.idx$ind[,2],
-                                x = dist.idx$ra,  dims = dist.idx$da)
-
-    txpy <- predicted.values <- vector(mode = "list", length = nobs)
-    trS <- sum(Matrix::diag(diffmat))
-
-    csums <- Matrix::colSums(diffmat)
-    for (i in 1:nobs) txpy[[i]] <- tcrossprod(x[i,])
-    for (i in 1:nobs)
-    {
-        sum.cov <- txpy[[1]] * as.numeric(diffmat[1,i])
-        for (j in 2:nobs) sum.cov <- sum.cov + txpy[[j]] * as.numeric(diffmat[j,i])
-
-        predicted.values[[i]] <- as.matrix(sum.cov / csums[i])
-    }
-
-    normdiff <- 0
-    diff.cov <- vector(mode = "list", length = length(predicted.values))
-    for (j in 1:nobs)
-    {
-        diff.cov[[j]] <- txpy[[j]] - predicted.values[[j]]
-        normdiff <- normdiff + norm(diff.cov[[j]], type = "F")^2
-    }
-
-    gcv <- (1 / nobs) * ((sqrt(normdiff) / (1 - trS / nobs)) ^ 2)
-
-    if (!ret.xtx) txpy <- NULL
-
-    list(fitted = predicted.values,
-         resid  = diff.cov,
-         gcv = gcv, xtx.list = txpy)
-}
-
-nwcov <- function(directions, x, txpy.list, h = 1, max.points = 100, ret.xtx = FALSE, ncuts = 3)
-{
-    nobs <- NROW(directions)
-    diff.cov <- vector(mode = "list", length = nobs)
-
-
-    pr.vals <- seq(0, 1, length.out = 3 + ncuts)
-    pr.vals <- pr.vals[-c(1, length(pr.vals))]
-    cuts <- apply(apply(directions, 2, function(x)
-        cut(x, breaks = c(min(x) - 0.001, quantile(x, probs = pr.vals), max(x) + 0.001 )  )), 1,
-        function(r) paste(r, collapse = "|"))
-
-    unique.cuts <- unique(cuts)
-
-    for (i in 1:length(unique.cuts))
-    {
-        in.idx <- which(cuts == unique.cuts[i])
-        n.curr <- length(in.idx)
-        mean.cov <- crossprod(x[in.idx,,drop=FALSE]) / n.curr
-        for (j in in.idx)
-        {
-            diff.cov[[j]] <- txpy.list[[j]] - mean.cov
-        }
-    }
-
-
-    list(resid  = diff.cov)
-}
+# nwsmooth <- function(x, y, h = 1, max.points = 100)
+# {
+#     nobs        <- NROW(x)
+#     dist.idx    <- fields.rdist.near(x, x, h, max.points = nobs * max.points)
+#     dist.idx$ra <- Kepanechnikov2(dist.idx$ra / h)
+#     diffmat     <- sparseMatrix(dist.idx$ind[,1], dist.idx$ind[,2],
+#                                 x = dist.idx$ra,  dims = dist.idx$da)
+#     #diffmat@x   <- Kepanechnikov2(diffmat@x)# / h
+#
+#     RSS <- sum(((Diagonal(nobs) - diffmat) %*% y)^2)/nobs
+#     predicted.values <- Matrix::colSums(y * diffmat) / Matrix::colSums(diffmat)
+#     trS <- sum(Matrix::diag(diffmat))
+#     #gcv <- (1 / nobs) * sum(( (y - predicted.values) / (1 - trS / nobs) ) ^ 2)
+#     gcv <- RSS / ((1 - trS / nobs) ) ^ 2
+#     list(fitted = predicted.values, gcv = gcv)
+# }
+#
+#
+# nwsmoothcov <- function(directions, x, h = 1, max.points = 100, ret.xtx = FALSE)
+# {
+#     nobs <- NROW(directions)
+#     dist.idx    <- fields.rdist.near(directions, directions, h,
+#                                      max.points = nobs * max.points)
+#     dist.idx$ra <- Kepanechnikov2(dist.idx$ra / h)
+#     diffmat     <- sparseMatrix(dist.idx$ind[,1], dist.idx$ind[,2],
+#                                 x = dist.idx$ra,  dims = dist.idx$da)
+#
+#     txpy <- predicted.values <- vector(mode = "list", length = nobs)
+#     trS <- sum(Matrix::diag(diffmat))
+#
+#     csums <- Matrix::colSums(diffmat)
+#     for (i in 1:nobs) txpy[[i]] <- tcrossprod(x[i,])
+#     for (i in 1:nobs)
+#     {
+#         sum.cov <- txpy[[1]] * as.numeric(diffmat[1,i])
+#         for (j in 2:nobs) sum.cov <- sum.cov + txpy[[j]] * as.numeric(diffmat[j,i])
+#
+#         predicted.values[[i]] <- as.matrix(sum.cov / csums[i])
+#     }
+#
+#     normdiff <- 0
+#     diff.cov <- vector(mode = "list", length = length(predicted.values))
+#     for (j in 1:nobs)
+#     {
+#         diff.cov[[j]] <- txpy[[j]] - predicted.values[[j]]
+#         normdiff <- normdiff + norm(diff.cov[[j]], type = "F")^2
+#     }
+#
+#     gcv <- (1 / nobs) * ((sqrt(normdiff) / (1 - trS / nobs)) ^ 2)
+#
+#     if (!ret.xtx) txpy <- NULL
+#
+#     list(fitted = predicted.values,
+#          resid  = diff.cov,
+#          gcv = gcv, xtx.list = txpy)
+# }
+#
+# nwcov <- function(directions, x, txpy.list, h = 1, max.points = 100, ret.xtx = FALSE, ncuts = 3)
+# {
+#     nobs <- NROW(directions)
+#     diff.cov <- vector(mode = "list", length = nobs)
+#
+#
+#     pr.vals <- seq(0, 1, length.out = 3 + ncuts)
+#     pr.vals <- pr.vals[-c(1, length(pr.vals))]
+#     cuts <- apply(apply(directions, 2, function(x)
+#         cut(x, breaks = c(min(x) - 0.001, quantile(x, probs = pr.vals), max(x) + 0.001 )  )), 1,
+#         function(r) paste(r, collapse = "|"))
+#
+#     unique.cuts <- unique(cuts)
+#
+#     for (i in 1:length(unique.cuts))
+#     {
+#         in.idx <- which(cuts == unique.cuts[i])
+#         n.curr <- length(in.idx)
+#         mean.cov <- crossprod(x[in.idx,,drop=FALSE]) / n.curr
+#         for (j in in.idx)
+#         {
+#             diff.cov[[j]] <- txpy.list[[j]] - mean.cov
+#         }
+#     }
+#
+#
+#     list(resid  = diff.cov)
+# }
 
 
 #' @export

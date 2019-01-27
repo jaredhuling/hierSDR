@@ -50,7 +50,7 @@ opt.est.eqn <- function(init, est.eqn, est.eqn.grad,
     {
         slver <-   lbfgs(vars      = init.par,
                          call_eval = est.eqn,
-                         call_gra  = est.eqn.grad,
+                         call_grad = est.eqn.grad,
                          nn.val    = nn,
                          optimize.nn = optimize.nn,
                          invisible = 1 * (!verbose),
