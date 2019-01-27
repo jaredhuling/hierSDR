@@ -75,6 +75,14 @@ newton.constr <- function(par, fn, constr.mat, maxit = 100L, tol = 1e-5, ...)
 }
 
 
+
+hasAllConds <- function(checkvec, combvec)
+{
+    comb <- which(combvec != 0)
+    all(checkvec[comb] != 0)
+}
+
+
 createBelowList <- function(combin.mat)
 {
 
@@ -480,8 +488,146 @@ createAboveList <- function(combin.mat)
 grassmannify <- function(mat)
 {
     dims <- dim(mat)
-    proj = t(mat[1:dims[2],,drop=FALSE]) %*% solve(tcrossprod(mat[1:dims[2],,drop=FALSE]))
+    proj <- t(mat[1:dims[2],,drop=FALSE]) %*% solve(tcrossprod(mat[1:dims[2],,drop=FALSE]))
     list(beta = mat %*% proj, proj = proj)
 }
+
+
+
+
+Proj <- function(b) b %*% solve(crossprod(b), t(b))
+
+#' Norm of difference of projections
+#' @description Measures distance between two subspaces
+#' @param B1 first matrix
+#' @param B1 second matrix
+#' @export proj.norm
+#' @usage proj.norm(B1, B2)
+#' @examples
+#' b1 <- matrix(rnorm(10 * 2), ncol = 2)
+#' b2 <- matrix(rnorm(10 * 2), ncol = 2)
+#' proj.norm(b1, b2)
+#'
+proj.norm <- function(B1, B2)
+{
+    norm(Proj(B1) - Proj(B2), type = "F")
+}
+
+#' Angle between two subspaces
+#' @description Measures angle between two subspaces
+#'  from http://www4.stat.ncsu.edu/~li/software/GroupDR.R
+#' @param B1 first matrix
+#' @param B1 second matrix
+#' @export
+#' @examples
+#' b1 <- matrix(rnorm(10 * 2), ncol = 2)
+#' b2 <- matrix(rnorm(10 * 2), ncol = 2)
+#' angle(b1, b2)
+angle <- function(B1, B2)
+{
+    if(!is.matrix(B1)) B1 <- as.matrix(B1)
+    if(!is.matrix(B2)) B2 <- as.matrix(B2)
+
+    if(ncol(B1) >= ncol(B2))
+    {
+        B     <- B1
+        B.hat <- B2
+    } else
+    {
+        B     <- B2
+        B.hat <- B1
+    }
+
+    P1 <- B %*% solve(crossprod(B), t(B))
+    if(ncol(B.hat) == 1)
+    {
+        nume  <- as.vector(t(B.hat) %*% P1 %*% B.hat)
+        deno  <- as.vector(t(B.hat) %*% B.hat)
+        ratio <- nume / deno
+    } else
+    {
+        BtB   <- crossprod(B.hat)
+        ei    <- eigen(BtB)
+        BtB2  <- ei$vectors %*% diag(1/sqrt(ei$values)) %*% t(ei$vectors)
+        M     <- BtB2 %*% t(B.hat) %*% P1 %*% B.hat %*% BtB2
+        ratio <- abs(eigen(M)$values[nrow(M)])
+    }
+    ans <- acos(sqrt(ratio)) / pi * 180
+    if(ans > 90) ans <- 180 - ans
+    return(ans)
+}
+
+
+
+# normalize a vector
+norm2 <- function(v)
+{
+    sumv2 <- sum(v ^ 2)
+    if(sumv2 == 0) sumv2 <- 1
+    v / sqrt(sumv2)
+}
+
+
+random.colspace <- function(beta, orthog = FALSE, min = 0)
+{
+    beta <- as.matrix(beta)
+
+    p <- nrow(beta)
+    d <- ncol(beta)
+
+    M <- matrix(runif(p ^ 2, min = min), ncol = p)
+    M <- 2 * matrix(rbinom(p ^ 2, 1, 0.5), ncol = p) - 1
+
+    if (orthog)
+    {
+        sv <- svd(M)
+        M  <- tcrossprod(sv$u, sv$v)
+    }
+
+    # if (ncol(beta) < ncol(M))
+    # {
+    #     ncm <- ncol(M) - d
+    #     beta <- cbind(beta, matrix(0, nrow = p, ncol = ncm))
+    #     newbeta <- M %*% beta %*% t(M)
+    #     beta <- newbeta[,1:d,drop=FALSE]
+    # }
+
+    list(beta = M %*% beta, mat = M)
+}
+
+
+
+
+# Gram-Schmidt orthonormalization
+#' @export
+orthnorm <- function(X)
+{
+    X <- as.matrix(X)
+    n <- nrow(X)
+    p <- ncol(X)
+
+    W <- NULL
+    if(p > 1)
+    {
+        W <- cbind(W, X[,1])
+        for(k in 2:p)
+        {
+            gw <- rep(0, n)
+            for(i in 1:(k-1))
+            {
+                gki <- as.vector((t(W[,i]) %*% X[,k]) / (t(W[,i]) %*% W[,i]))
+                gw  <- gw + gki * W[,i]
+            }
+            W <- cbind(W, X[,k] - gw)
+        }
+    } else
+    {
+        W <- cbind(W, X[,1])
+    }
+
+    W <- apply(W, 2, norm)
+    W
+}
+
 
 
