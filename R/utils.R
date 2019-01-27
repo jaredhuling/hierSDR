@@ -595,15 +595,7 @@ random.colspace <- function(beta, orthog = FALSE, min = 0)
 }
 
 
-
-
-#'  Gram-Schmidt orthonormalization
-#' @param X matrix to orthonormalize
-#' @export
-#' @examples
-#' X <- matrix(rnorm(10 * 2), ncol = 2)
-#' X
-#' orthnorm(X)
+# Gram-Schmidt orthogonalization
 orthnorm <- function(X)
 {
     X <- as.matrix(X)
@@ -629,7 +621,7 @@ orthnorm <- function(X)
         W <- cbind(W, X[,1])
     }
 
-    W <- apply(W, 2, norm)
+    W <- apply(W, 2, norm2)
     W
 }
 

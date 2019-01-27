@@ -3,7 +3,6 @@
 S3method(plot,hier_sdr_fit)
 export(angle)
 export(hier.sphd)
-export(orthnorm)
 export(phd)
 export(projnorm)
 export(semi.phd)

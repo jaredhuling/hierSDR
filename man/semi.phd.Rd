@@ -33,6 +33,8 @@ for a principle Hessian directions initialization approach}
 
 \item{verbose}{should results be printed along the way?}
 
+\item{n.samples}{number of samples for the random initialization method}
+
 \item{degree}{degree of kernel to use}
 
 \item{vic}{logical value of whether or not to compute the VIC criterion for dimension determination}

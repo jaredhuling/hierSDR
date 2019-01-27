@@ -137,6 +137,7 @@ phd <- function(x, y, d = 5L)
 #' @param vic logical value of whether or not to compute the VIC criterion for dimension determination
 #' @param nn nearest neighbor parameter for \code{\link[locfit]{locfit.raw}}
 #' @param optimize.nn should \code{nn} be optimized? Not recommended
+#' @param n.samples number of samples for the random initialization method
 #' @param verbose should results be printed along the way?
 #' @param degree degree of kernel to use
 #' @param ... extra arguments passed to \code{\link[locfit]{locfit.raw}}
@@ -396,7 +397,7 @@ semi.phd <- function(x, y, d = 5L, maxit = 100L, h = NULL,
          final.gcv    = min(gcv.vals),
          final.model  = locfit.mod,
          all.gcvs     = gcv.vals,
-         rsq          = rsq.mean,
+         #rsq          = rsq.mean,
          nn           = nn,
          vic          = vic)
 }
