@@ -597,8 +597,13 @@ random.colspace <- function(beta, orthog = FALSE, min = 0)
 
 
 
-# Gram-Schmidt orthonormalization
+#'  Gram-Schmidt orthonormalization
+#' @param X matrix to orthonormalize
 #' @export
+#' @examples
+#' X <- matrix(rnorm(10 * 2), ncol = 2)
+#' X
+#' orthnorm(X)
 orthnorm <- function(X)
 {
     X <- as.matrix(X)

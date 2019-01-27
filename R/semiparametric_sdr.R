@@ -90,6 +90,13 @@ Kepanechnikov2 <- function(u) 0.75 * (1 - (u) ^ 2)
 # }
 
 
+#' PHD SDR fitting function
+#'
+#' @description fits SDR models (PHD approach)
+#'
+#' @param x an n x p matrix of covariates, where each row is an observation and each column is a predictor
+#' @param y vector of responses of length n
+#' @param d an integer representing the structural dimension
 #' @export
 phd <- function(x, y, d = 5L)
 {
@@ -114,8 +121,27 @@ phd <- function(x, y, d = 5L)
 }
 
 
+#' Semiparametric PHD SDR fitting function
+#'
+#' @description fits semiparametric SDR models (PHD approach)
+#'
+#' @param x an n x p matrix of covariates, where each row is an observation and each column is a predictor
+#' @param y vector of responses of length n
+#' @param d an integer representing the structural dimension
+#' @param maxit maximum number of iterations
+#' @param h bandwidth parameter. By default, a reasonable choice is selected automatically
+#' @param opt.method optimization method to use. Available choices are
+#' \code{c("lbfgs2", "lbfgs.x", "bfgs.x", "bfgs", "lbfgs", "spg", "ucminf", "CG", "nlm", "nlminb", "newuoa")}
+#' @param init.method method for parameter initialization. Either \code{"random"} for random initialization or \code{"phd"}
+#' for a principle Hessian directions initialization approach
+#' @param vic logical value of whether or not to compute the VIC criterion for dimension determination
+#' @param nn nearest neighbor parameter for \code{\link[locfit]{locfit.raw}}
+#' @param optimize.nn should \code{nn} be optimized? Not recommended
+#' @param verbose should results be printed along the way?
+#' @param degree degree of kernel to use
+#' @param ... extra arguments passed to \code{\link[locfit]{locfit.raw}}
 #' @export
-semi.phd <- function(x, y, d = 5L, maxit = 10L, h = NULL,
+semi.phd <- function(x, y, d = 5L, maxit = 100L, h = NULL,
                      opt.method = c("lbfgs.x", "bfgs", "lbfgs2",
                                     "bfgs.x",
                                     "lbfgs",
