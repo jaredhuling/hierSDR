@@ -157,7 +157,7 @@ semi.phd <- function(x, y, d = 5L, maxit = 100L, h = NULL,
                      optimize.nn = FALSE, verbose = TRUE,
                      n.samples = 100,
                      degree = 2,
-                     vic = FALSE, ...)
+                     vic = TRUE, ...)
 {
     cov <- cov(x)
     eig.cov <- eigen(cov)
@@ -226,10 +226,10 @@ semi.phd <- function(x, y, d = 5L, maxit = 100L, h = NULL,
     }
 
 
-    est.eqn.vic <- function(beta.vec, nn.val)
+    est.eqn.vic <- function(beta.mat, nn.val)
     {
         #beta.mat   <- rbind(beta.init[1:d,], matrix(beta.vec, ncol = d))
-        beta.mat   <- matrix(beta.vec, ncol = d + 1)
+        #beta.mat   <- matrix(beta.vec, ncol = d + 1)
         directions <- x.tilde %*% beta.mat
         #gcv.vals   <- sapply(h, function(hv) gcv(x = directions, y = y, alpha = hv, deg = 3, ...)[4])
         best.h     <- best.h.init # h[which.min(gcv.vals)]
@@ -346,27 +346,30 @@ semi.phd <- function(x, y, d = 5L, maxit = 100L, h = NULL,
 
     }
 
-    beta.semi <- rbind(diag(d), matrix(slver$par, ncol = d))
+    beta.semi.lower <- matrix(slver$par, ncol = d)
+    beta.semi <- rbind(diag(d), beta.semi.lower)
 
     ## calculate VIC
     if (vic)
     {
-        beta.u <- beta.semi[1,,drop=FALSE]
+        beta.u <- beta.semi.lower[1,,drop=FALSE]
+        beta.l <- beta.semi.lower[-1,,drop=FALSE]
 
         v_vec <- c(-2, -1, 0, 1, 2)
 
         eqn.vals.vic <- numeric(length(v_vec))
 
-        for (v in 1:v_vec)
+        for (v in 1:length(v_vec))
         {
-            v.1  <- matrix(rep(v_vec[v], nrow(beta.semi) - 1), ncol=1)
-            vk.1 <- matrix(0, ncol=ncol(beta.semi) + 1, nrow=nrow(beta.semi))
-            vk.1[-1,-ncol(vk.1)] <- vk.1[-1,-ncol(vk.1)] - drop(v.1 %*% beta.u)
-            vk.1[-1,ncol(vk.1)]  <- v.1
-            vk.1[1,] <- c(rep(0, ncol(vk.1) - 1), 1)
+            v.1  <- matrix(rep(v_vec[v], nrow(beta.semi.lower) - 1), ncol=1)
+            vk.1 <- matrix(0, ncol=ncol(beta.semi.lower) + 1, nrow=nrow(beta.semi.lower)-1)
+            vk.1[,-ncol(vk.1)] <- beta.l - drop(v.1 %*% beta.u)
+            vk.1[,ncol(vk.1)]  <- v.1
             vk.1.vec <- as.vector(vk.1)
 
-            eqn.vals.vic[v] <- est.eqn.vic(vk.1.vec) * nobs
+            beta.mat.vic <- rbind(diag(ncol(vk.1)), vk.1)
+
+            eqn.vals.vic[v] <- est.eqn.vic(beta.mat.vic, nn) * nobs
         }
 
         vic <- mean(eqn.vals.vic) + nvars * d * log(nobs)

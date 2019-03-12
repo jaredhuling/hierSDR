@@ -14,6 +14,7 @@ angle(B1, B2)
 \description{
 Measures angle between two subspaces
  from http://www4.stat.ncsu.edu/~li/software/GroupDR.R
+ http://lexinli.biostat.berkeley.edu/softwares/dr/GroupDR.R
 }
 \examples{
 b1 <- matrix(rnorm(10 * 2), ncol = 2)

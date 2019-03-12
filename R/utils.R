@@ -515,6 +515,7 @@ projnorm <- function(B1, B2)
 #' Angle between two subspaces
 #' @description Measures angle between two subspaces
 #'  from http://www4.stat.ncsu.edu/~li/software/GroupDR.R
+#'  http://lexinli.biostat.berkeley.edu/softwares/dr/GroupDR.R
 #' @param B1 first matrix
 #' @param B2 second matrix
 #' @export

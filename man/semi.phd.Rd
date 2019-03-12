@@ -8,7 +8,7 @@ semi.phd(x, y, d = 5L, maxit = 100L, h = NULL,
   opt.method = c("lbfgs.x", "bfgs", "lbfgs2", "bfgs.x", "lbfgs", "spg",
   "ucminf", "CG", "nlm", "nlminb", "newuoa"), nn = NULL,
   init.method = c("random", "phd"), optimize.nn = FALSE,
-  verbose = TRUE, n.samples = 100, degree = 2, vic = FALSE, ...)
+  verbose = TRUE, n.samples = 100, degree = 2, vic = TRUE, ...)
 }
 \arguments{
 \item{x}{an n x p matrix of covariates, where each row is an observation and each column is a predictor}
