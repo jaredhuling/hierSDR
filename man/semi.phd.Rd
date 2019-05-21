@@ -6,7 +6,7 @@
 \usage{
 semi.phd(x, y, d = 5L, maxit = 100L, h = NULL,
   opt.method = c("lbfgs.x", "bfgs", "lbfgs2", "bfgs.x", "lbfgs", "spg",
-  "ucminf", "CG", "nlm", "nlminb", "newuoa"), nn = NULL,
+  "ucminf", "CG", "nlm", "nlminb", "newuoa"), nn = 0.95,
   init.method = c("random", "phd"), optimize.nn = FALSE,
   verbose = TRUE, n.samples = 100, degree = 2, vic = TRUE, ...)
 }

@@ -8,7 +8,7 @@ hier.sphd(x, y, z, z.combinations, d, weights = rep(1L, NROW(y)),
   maxit = 250L, h = NULL, opt.method = c("lbfgs2", "lbfgs.x",
   "bfgs.x", "bfgs", "lbfgs", "spg", "ucminf", "CG", "nlm", "nlminb",
   "newuoa"), init.method = c("random", "phd"), vic = TRUE,
-  grassmann = TRUE, nn = NULL, nn.try = c(0.15, 0.25, 0.5, 0.75, 0.9,
+  grassmann = TRUE, nn = 0.95, nn.try = c(0.15, 0.25, 0.5, 0.75, 0.9,
   0.95), optimize.nn = FALSE, separate.nn = FALSE,
   constrain.none.subpop = TRUE, verbose = TRUE, degree = 2,
   pooled = FALSE, ...)

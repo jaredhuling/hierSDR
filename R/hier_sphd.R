@@ -59,7 +59,7 @@ hier.sphd <- function(x, y, z, z.combinations, d,
                       init.method           = c("random", "phd"),
                       vic                   = TRUE,     # should the VIC be calculated?
                       grassmann             = TRUE,     # constrain parameters to the Grassmann manifold?
-                      nn                    = NULL,     # nn fraction. Will be chosen automatically if nn = NULL
+                      nn                    = 0.95,     # nn fraction. Will be chosen automatically if nn = NULL
                       nn.try                = c(0.15, 0.25, 0.5, 0.75, 0.9, 0.95), # values to try if nn = NULL (more values takes longer)
                       optimize.nn           = FALSE,    # should nn be optimized? not recommended.
                       separate.nn           = FALSE,    # should each subpopulation have a separate nn? only used if nn = NULL
