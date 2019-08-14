@@ -2,7 +2,7 @@ Package: hierSDR
 Type: Package
 Title: Hierarchical Sufficient Dimension Reduction
 Version: 0.1
-Authors@R: person("Jared", "Huling", email = "jaredhuling@gmail.com", role = c("aut", "cre"))
+Authors@R: person("Author", "Name", email = "author@email.com", role = c("aut", "cre"))
 Description: Provides semiparametric estimation of hierarchical SDR models.
 License: GPL-2
 Encoding: UTF-8
@@ -14,4 +14,4 @@ Depends:
     optimx,
     lbfgs
 LazyData: TRUE
-RoxygenNote: 6.1.0
+RoxygenNote: 6.1.1

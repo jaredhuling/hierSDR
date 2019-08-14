@@ -435,3 +435,301 @@ sir <- function(x, y, h = 10L, d = 5L, slice.ind = NULL)
     beta.hat <- t(t(eta.hat) %*% sqrt.inv.cov)
     list(beta.hat = beta.hat, eta.hat = eta.hat, eigenvalues = eig.V$values)
 }
+
+
+
+
+
+#' Main hierarchical SDR fitting function
+#'
+#' @description fits hierarchical SDR models
+#'
+#' @param x an n x p matrix of covariates, where each row is an observation and each column is a predictor
+#' @param y vector of responses of length n
+#' @param z an n x C matrix of binary indicators, where each column is a binary variable indicating the presence
+#' of a binary variable which acts as a stratifying variable. Each combination of all columns of \code{z} pertains
+#' to a different subpopulation. WARNING: do not use too many binary variables in \code{z} or else it will quickly
+#' result in subpopulations with no observations
+#' @param z.combinations a matrix of dimensions 2^C x C with each row indicating a different combination of the possible
+#' values in \code{z}. Each combination represents a subpopulation. This is necessary because we need to specify a
+#' different structural dimension for each subpopulation, so we need to know the ordering of the subpopulations so we
+#' can assign each one a structural dimension
+#' @param d an integer vector of length 2^C of structural dimensions. Specified in the same order as the rows in
+#' \code{z.combinations}
+#' @param weights vector of observation weights
+#' @param constrain.none.subpop should the "none" subpopulation be constrained to be contained in every other subpopulation's
+#' dimension reduction subspace? Recommended to set to \code{TRUE}
+#' @param pooled should the estimator be a pooled estimator?
+#' @param ... not used
+#' @export
+#' @examples
+#'
+#' library(hierSDR)
+#'
+hier.phd.nt <- function(x, y, z, z.combinations, d,
+                        weights = rep(1L, NROW(y)),
+                        constrain.none.subpop = TRUE,     # should we constrain S_{none} \subseteq S_{M} for all M?
+                        pooled                = FALSE,
+                        ...)
+{
+
+    nobs <- NROW(x)
+
+    if (nobs != NROW(z)) stop("number of observations in x doesn't match number of observations in z")
+
+    z.combinations <- data.matrix(z.combinations)
+    combinations   <- apply(z.combinations, 1, function(rr) paste(rr, collapse = ","))
+    n.combinations <- length(combinations)
+
+    if (nrow(z.combinations) != n.combinations) stop("duplicated row in z.combinations")
+
+    z.combs   <- apply(z, 1, function(rr) paste(rr, collapse = ","))
+    n.combs.z <- length(unique(z.combs))
+
+    if (n.combinations != n.combs.z) stop("number of combinations of factors in z differs from that in z.combinations")
+
+    x.list <- y.list <- weights.list <- strat.idx.list <- vector(mode = "list", length = n.combinations)
+
+    for (c in 1:n.combinations)
+    {
+        strat.idx.list[[c]] <- which(z.combs == combinations[c])
+        x.list[[c]]         <- x[strat.idx.list[[c]],]
+        y.list[[c]]         <- y[strat.idx.list[[c]]]
+        weights.list[[c]]   <- weights[strat.idx.list[[c]]]
+    }
+
+
+    p <- nvars <- ncol(x)
+
+    opt.method  <- match.arg(opt.method)
+    init.method <- match.arg(init.method)
+
+    d <- as.vector(d)
+    names(d) <- NULL
+
+    if (length(d) != nrow(z.combinations)) stop("number of subpopulations implied by 'z.combinations' does not match that of 'd'")
+    if (length(d) != length(x.list) ) stop("number of subpopulations implied by 'x.list' does not match that of 'd'")
+
+    nobs.vec  <- unlist(lapply(x.list, nrow))
+    nvars.vec <- unlist(lapply(x.list, ncol))
+    pp        <- nvars.vec[1]
+
+    nobs <- sum(nobs.vec)
+
+    if (nobs != NROW(y)) stop("unequal number of observations in x.list and y")
+
+    D <- sum(d)
+    d.vic <- d + 1
+    D.vic <- sum(d.vic)
+
+    cum.d     <- c(0, cumsum(d))
+    cum.d.vic <- c(0, cumsum(d.vic))
+
+    cov <- lapply(x.list, cov)
+
+    x.big <- as.matrix(bdiag(x.list))
+    cov.b <- cov(as.matrix(x.big))
+    eig.cov.b <- eigen(cov.b)
+    eigs <- eig.cov.b$values
+    eigs[eigs <= 0] <- 1e-5
+    sqrt.inv.cov.b <- eig.cov.b$vectors %*% diag(1 / sqrt(eigs)) %*% t(eig.cov.b$vectors)
+    x.tilde.b <- scale(x.big, scale = FALSE) %*% sqrt.inv.cov.b
+
+    sqrt.inv.cov <- lapply(1:length(x.list), function(i) {
+        eig.cov <- eigen(cov[[i]])
+        eigvals <- eig.cov$values
+        eigvals[eigvals <= 0] <- 1e-5
+        eig.cov$vectors %*% diag(1 / sqrt(eigvals)) %*% t(eig.cov$vectors)
+    })
+
+    x.tilde <- lapply(1:length(x.list), function(i) {
+        scale(x.list[[i]], scale = FALSE) %*% sqrt.inv.cov[[i]]# / sqrt(nobs.vec[i])
+    })
+
+    x.tilde.tall <- do.call(rbind, x.tilde)
+
+
+    # construct linear constraint matrices
+    constraints <- vector(mode = "list", length = nrow(z.combinations))
+
+    names(constraints) <- combinations
+
+
+    for (cr in 1:nrow(z.combinations))
+    {
+        cur.comb <- combinations[cr]
+
+        other.idx <- (1:nrow(z.combinations))[-cr]
+
+        first.mat <- TRUE
+        for (i in other.idx)
+        {
+            if (hasAllConds(z.combinations[i,], z.combinations[cr,]) & !(!constrain.none.subpop & all(z.combinations[cr,] == 0)))
+            { # if the ith subpopulation is nested within the one indexed by 'cr'
+                # then we apply equality constraints (but only if it's not the none subpop
+                # (unless we want to constrain the none subpop))
+
+                constr.idx <- rep(0, nrow(z.combinations))
+                constr.idx[c(cr, i)] <- c(1, -1)
+                constr.mat.eq  <- do.call(rbind, lapply(constr.idx, function(ii) diag(rep(ii, p))))
+
+
+                if (first.mat)
+                {
+                    first.mat  <- FALSE
+                    constr.mat <- constr.mat.eq # cbind(constr.mat.eq, constr.mat.zero)
+                } else
+                {
+                    constr.mat <- cbind(constr.mat, constr.mat.eq) # constr.mat.zero
+                }
+            } else
+            {
+                # else we apply constraints to be zero
+
+                constr.idx.zero <- rep(0, nrow(z.combinations))
+                constr.idx.zero[i] <- 1
+                constr.mat.zero <- do.call(rbind, lapply(constr.idx.zero, function(ii) diag(rep(ii, p))))
+
+                if (first.mat)
+                {
+                    first.mat  <- FALSE
+                    constr.mat <- constr.mat.zero # cbind(constr.mat.eq, constr.mat.zero)
+                } else
+                {
+                    constr.mat <- cbind(constr.mat, constr.mat.zero) # constr.mat.zero
+                }
+            }
+        }
+
+        constraints[[cr]] <- constr.mat
+
+    }
+
+    strat.id  <- unlist(lapply(1:length(x.list), function(id) rep(id, nrow(x.list[[id]]))))
+
+    V.hat     <- crossprod(x.tilde.b, drop(scale(y, scale = FALSE)) * x.tilde.b) / nrow(x.tilde.b)
+
+    beta.list <- beta.init.list <- Proj.constr.list <- vector(mode = "list", length = length(constraints))
+
+
+
+    for (c in 1:length(constraints))
+    {
+        #print(d)
+        if (d[c] > 0)
+        {
+            Pc <- constraints[[c]] %*% solve(crossprod(constraints[[c]]), t(constraints[[c]]))
+
+            Proj.constr.list[[c]] <- diag(ncol(Pc)) - Pc
+
+            #eig.c          <- eigen(Proj.constr.list[[c]] %*% V.hat )
+            #eta.hat        <- eig.c$vectors[,1:d[c], drop=FALSE]
+
+            #real.eta <- Re(eta.hat)
+
+
+            D          <- eigen(Proj.constr.list[[c]] %*% V.hat )
+
+            or <- rev(order(abs(D$values)))
+            evalues <- D$values[or]
+            raw.evectors <- Re(D$vectors[,or])
+
+            qr_R <- function(object)
+            {
+                qr.R(object)[1:object$rank,1:object$rank]
+            }
+
+            # evectors <- backsolve(sqrt(nrow(x.big))*qr_R(qr.b),raw.evectors)
+            # evectors <- if (is.matrix(evectors)) evectors else matrix(evectors,ncol=1)
+            # evectors <- apply(evectors,2,function(x) x/sqrt(sum(x^2)))
+
+            #real.eta <- Re(raw.evectors[,1:d[c], drop=FALSE])
+            real.eta <- Re(raw.evectors[,1:d[c], drop=FALSE])
+
+            whichzero <- apply(real.eta, 2, function(cl) all(abs(cl) <= 1e-12))
+
+            #print((real.eta[,!whichzero,drop=FALSE]))
+            #real.eta[,!whichzero] <- grassmannify(real.eta[,!whichzero,drop=FALSE])$beta
+
+            beta.list[[c]] <- real.eta
+        }
+    }
+
+
+    Proj.constr.list <- Proj.constr.list[!sapply(Proj.constr.list, is.null)]
+
+    #eig.V <- eigen(V.hat)
+    beta.init     <- do.call(cbind, beta.list) #eig.V$vectors[,1:d,drop=FALSE]
+
+    unique.strata <- unique(strat.id)
+    num.strata    <- length(unique.strata)
+
+    beta.component.init <- beta.list
+    ct <- 0
+
+    for (s in 1:length(beta.list))
+    {
+        if (d[s] > 0)
+        {
+            beta.component.init[[s]] <- beta.list[[s]][(p * (s - 1) + 1):(p * s),,drop = FALSE]
+        }
+    }
+
+    beta.component.init <- lapply(beta.component.init, function(bb) {
+        if (!is.null(bb))
+        {
+            nc <- ncol(bb)
+
+            whichzero <- apply(bb, 2, function(cl) all(abs(cl) <= 1e-12))
+
+            bb <- grassmannify(bb)$beta
+            bb[(nc + 1):nrow(bb),]
+        } else
+        {
+            NULL
+        }
+    })
+
+    init <- unlist(beta.component.init)
+
+    txpy.list <- vector(mode = "list", length = n.combinations)
+    for (s in 1:n.combinations)
+    {
+        txpy.list[[s]] <- vector(mode = "list", length = NROW(x.tilde[[s]]))
+        for (j in 1:NROW(x.tilde[[s]])) txpy.list[[s]][[j]] <- tcrossprod(x.tilde[[s]][j,])
+    }
+
+
+    ncuts <- 3
+
+
+
+
+    #######    model fitting to determine bandwidth     ########
+
+
+
+
+
+
+    model.list <- vector(mode = "list", length = 3)
+
+    directions.list <- vector(mode = "list", length = n.combinations)
+
+    for (m in 1:n.combinations)
+    {
+        directions.list[[m]] <- x.tilde[[m]] %*% beta.list[[m]]
+    }
+
+    names(beta.list) <- names(directions.list) <- combinations
+
+
+    ret <- list(beta           = beta.list,
+                directions     = directions.list,
+                y.list         = y.list,
+                z.combinations = z.combinations,
+                cov            = cov,
+                sqrt.inv.cov   = sqrt.inv.cov)
+    ret
+}
+
