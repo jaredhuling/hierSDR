@@ -501,8 +501,6 @@ hier.phd.nt <- function(x, y, z, z.combinations, d,
 
     p <- nvars <- ncol(x)
 
-    opt.method  <- match.arg(opt.method)
-    init.method <- match.arg(init.method)
 
     d <- as.vector(d)
     names(d) <- NULL
@@ -700,6 +698,8 @@ hier.phd.nt <- function(x, y, z, z.combinations, d,
     }
 
 
+    beta.mat.list  <- vec2subpopMatsId(init, p, d, z.combinations)
+
     ncuts <- 3
 
 
@@ -718,13 +718,13 @@ hier.phd.nt <- function(x, y, z, z.combinations, d,
 
     for (m in 1:n.combinations)
     {
-        directions.list[[m]] <- x.tilde[[m]] %*% beta.list[[m]]
+        directions.list[[m]] <- x.tilde[[m]] %*% beta.mat.list[[m]]
     }
 
-    names(beta.list) <- names(directions.list) <- combinations
+    names(beta.mat.list) <- names(directions.list) <- combinations
 
 
-    ret <- list(beta           = beta.list,
+    ret <- list(beta           = beta.mat.list,
                 directions     = directions.list,
                 y.list         = y.list,
                 z.combinations = z.combinations,
