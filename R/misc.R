@@ -14,7 +14,7 @@ opt.est.eqn <- function(init, est.eqn, est.eqn.grad,
                                        "nlminb",
                                        "newuoa"),
                         nn = 0.75,
-                        optimize.nn = FALSE, maxit = 100, verbose = FALSE)
+                        optimize.nn = FALSE, maxit = 100, tol = 1e-8, verbose = FALSE)
 {
     opt.method <- match.arg(opt.method)
 
@@ -34,7 +34,8 @@ opt.est.eqn <- function(init, est.eqn, est.eqn.grad,
                          method  = "BFGS",
                          nn.val  = nn,
                          optimize.nn = optimize.nn,
-                         control = list(maxit = maxit, abstol = 1e-10))
+                         control = list(maxit = maxit, abstol = 1e-10,
+                                        reltol = tol))
         if (optimize.nn) slver$par <- slver$par[-1]
     } else if (opt.method == "lbfgs")
     {
@@ -44,7 +45,7 @@ opt.est.eqn <- function(init, est.eqn, est.eqn.grad,
                          method  = "L-BFGS",
                          nn.val  = nn,
                          optimize.nn = optimize.nn,
-                         control = list(maxit = maxit, factr = 1e-10))
+                         control = list(maxit = maxit, factr = tol))
         if (optimize.nn) slver$par <- slver$par[-1]
     } else if (opt.method == "lbfgs2")
     {
@@ -53,6 +54,7 @@ opt.est.eqn <- function(init, est.eqn, est.eqn.grad,
                          call_grad = est.eqn.grad,
                          nn.val    = nn,
                          optimize.nn = optimize.nn,
+                         epsilon = tol * 100,
                          invisible = 1 * (!verbose),
                          max_iterations = maxit)
         if (optimize.nn) slver$par <- slver$par[-1]
@@ -63,6 +65,7 @@ opt.est.eqn <- function(init, est.eqn, est.eqn.grad,
                           #gr      = est.eqn.grad,
                           control = list(trace = 1 * verbose,
                                          maxit = maxit,
+                                         reltol = tol,
                                          kkt = FALSE),
                           method  = "BFGS",
                           nn.val  = nn,
@@ -90,6 +93,7 @@ opt.est.eqn <- function(init, est.eqn, est.eqn.grad,
                           #gr      = est.eqn.grad,
                           control = list(trace = 1 * verbose,
                                          maxit = maxit,
+                                         factr = tol,
                                          kkt = FALSE),
                           method  = "L-BFGS-B",
                           nn.val  = nn,
@@ -189,6 +193,7 @@ try.nn <- function(nn.vals = c(0.1, 0.25, 0.5, 0.75, 0.9, 0.95),
                                 nn           = nn.vals.cur,
                                 optimize.nn  = optimize.nn,
                                 maxit        = maxit,
+                                tol          = 1e-14,
                                 verbose      = verbose > 1)
                 }, warning = warn_handle)
 

@@ -4,8 +4,17 @@
 \alias{hier.phd.nt}
 \title{Main hierarchical SDR fitting function}
 \usage{
-hier.phd.nt(x, y, z, z.combinations, d, weights = rep(1L, NROW(y)),
-  constrain.none.subpop = TRUE, pooled = FALSE, ...)
+hier.phd.nt(
+  x,
+  y,
+  z,
+  z.combinations,
+  d,
+  weights = rep(1L, NROW(y)),
+  constrain.none.subpop = TRUE,
+  pooled = FALSE,
+  ...
+)
 }
 \arguments{
 \item{x}{an n x p matrix of covariates, where each row is an observation and each column is a predictor}

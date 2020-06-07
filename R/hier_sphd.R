@@ -18,7 +18,8 @@
 #' @param d an integer vector of length 2^C of structural dimensions. Specified in the same order as the rows in
 #' \code{z.combinations}
 #' @param weights vector of observation weights
-#' @param maxit maximum number of iterations
+#' @param maxit maximum number of iterations for optimization routines
+#' @param tol convergence tolerance for optimization routines. Defaults to \code{1e-6}
 #' @param h bandwidth parameter. By default, a reasonable choice is selected automatically
 #' @param opt.method optimization method to use. Available choices are
 #' \code{c("lbfgs2", "lbfgs.x", "bfgs.x", "bfgs", "lbfgs", "spg", "ucminf", "CG", "nlm", "nlminb", "newuoa")}
@@ -42,9 +43,40 @@
 #'
 #' library(hierSDR)
 #'
+#' set.seed(123)
+#' dat <- simulate_data(nobs = 200, nvars = 10,
+#'                      x.type = "some_categorical",
+#'                      sd.y = 1, model = 2)
+#'
+#' x <- dat$x ## covariates
+#' z <- dat$z ## factor indicators
+#' y <- dat$y ## response
+#'
+#' dat$beta ## true coefficients that generate the subspaces
+#'
+#' dat$z.combinations ## what combinations of z represent different subpops
+#'
+#' ## correct structural dimensions:
+#' dat$d.correct
+#'
+#' ## fit hier SPHD model:
+#'
+#' hiermod <- hier.sphd(x, y, z, dat$z.combinations, d = dat$d.correct, nn = 0.95,
+#'                      verbose = FALSE, maxit = 250, maxk = 8200)
+#'
+#' ## validated inf criterion for choosing dimensions (the smaller the better)
+#' hiermod$vic
+#'
+#'
+#' cbind(hiermod$beta[[4]], NA, dat$beta[[4]])
+#'
+#' ## angles between estimated and true subspaces for each population:
+#' mapply(function(x,y) angle(x,y), hiermod$beta, dat$beta)
+#'
+#'
 hier.sphd <- function(x, y, z, z.combinations, d,
                       weights = rep(1L, NROW(y)),
-                      maxit = 250L,
+                      maxit = 250L, tol = 1e-9,
                       h = NULL,
                       opt.method = c("lbfgs2", "lbfgs.x",
                                      "bfgs.x",
@@ -59,8 +91,9 @@ hier.sphd <- function(x, y, z, z.combinations, d,
                       init.method           = c("random", "phd"),
                       vic                   = TRUE,     # should the VIC be calculated?
                       grassmann             = TRUE,     # constrain parameters to the Grassmann manifold?
-                      nn                    = 0.95,     # nn fraction. Will be chosen automatically if nn = NULL
+                      nn                    = NULL,     # nn fraction. Will be chosen automatically if nn = NULL
                       nn.try                = c(0.15, 0.25, 0.5, 0.75, 0.9, 0.95), # values to try if nn = NULL (more values takes longer)
+                      n.random              = 100L,
                       optimize.nn           = FALSE,    # should nn be optimized? not recommended.
                       separate.nn           = FALSE,    # should each subpopulation have a separate nn? only used if nn = NULL
                       constrain.none.subpop = TRUE,     # should we constrain S_{none} \subseteq S_{M} for all M?
@@ -557,11 +590,11 @@ hier.sphd <- function(x, y, z, z.combinations, d,
 
     if (init.method == "random")
     {
-        n.samples <- 100
+        n.samples <- n.random
         beta.list.phd <- beta.list.tmp <- beta.list
         best.value <- 1e99
 
-        nn.vals <- c(0.05, 0.15, 0.25, 0.5, 0.75, 0.9, 0.95)
+        nn.vals <- nn.try
         for (tr in 1:n.samples)
         {
             par.cur <- runif(npar, min = min(init), max = max(init))
@@ -636,6 +669,7 @@ hier.sphd <- function(x, y, z, z.combinations, d,
                          nn           = nn,
                          optimize.nn  = optimize.nn,
                          maxit        = maxit,
+                         tol          = tol,
                          verbose      = verbose)
 
 

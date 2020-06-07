@@ -4,14 +4,32 @@
 \alias{hier.sphd}
 \title{Main hierarchical SDR fitting function}
 \usage{
-hier.sphd(x, y, z, z.combinations, d, weights = rep(1L, NROW(y)),
-  maxit = 250L, h = NULL, opt.method = c("lbfgs2", "lbfgs.x",
-  "bfgs.x", "bfgs", "lbfgs", "spg", "ucminf", "CG", "nlm", "nlminb",
-  "newuoa"), init.method = c("random", "phd"), vic = TRUE,
-  grassmann = TRUE, nn = 0.95, nn.try = c(0.15, 0.25, 0.5, 0.75, 0.9,
-  0.95), optimize.nn = FALSE, separate.nn = FALSE,
-  constrain.none.subpop = TRUE, verbose = TRUE, degree = 2,
-  pooled = FALSE, ...)
+hier.sphd(
+  x,
+  y,
+  z,
+  z.combinations,
+  d,
+  weights = rep(1L, NROW(y)),
+  maxit = 250L,
+  tol = 1e-09,
+  h = NULL,
+  opt.method = c("lbfgs2", "lbfgs.x", "bfgs.x", "bfgs", "lbfgs", "spg", "ucminf", "CG",
+    "nlm", "nlminb", "newuoa"),
+  init.method = c("random", "phd"),
+  vic = TRUE,
+  grassmann = TRUE,
+  nn = NULL,
+  nn.try = c(0.15, 0.25, 0.5, 0.75, 0.9, 0.95),
+  n.random = 100L,
+  optimize.nn = FALSE,
+  separate.nn = FALSE,
+  constrain.none.subpop = TRUE,
+  verbose = TRUE,
+  degree = 2,
+  pooled = FALSE,
+  ...
+)
 }
 \arguments{
 \item{x}{an n x p matrix of covariates, where each row is an observation and each column is a predictor}
@@ -33,7 +51,9 @@ can assign each one a structural dimension}
 
 \item{weights}{vector of observation weights}
 
-\item{maxit}{maximum number of iterations}
+\item{maxit}{maximum number of iterations for optimization routines}
+
+\item{tol}{convergence tolerance for optimization routines. Defaults to \code{1e-6}}
 
 \item{h}{bandwidth parameter. By default, a reasonable choice is selected automatically}
 
@@ -73,5 +93,36 @@ fits hierarchical SDR models
 \examples{
 
 library(hierSDR)
+
+set.seed(123)
+dat <- simulate_data(nobs = 200, nvars = 10,
+                     x.type = "some_categorical",
+                     sd.y = 1, model = 2)
+
+x <- dat$x ## covariates
+z <- dat$z ## factor indicators
+y <- dat$y ## response
+
+dat$beta ## true coefficients that generate the subspaces
+
+dat$z.combinations ## what combinations of z represent different subpops
+
+## correct structural dimensions:
+dat$d.correct
+
+## fit hier SPHD model:
+
+hiermod <- hier.sphd(x, y, z, dat$z.combinations, d = dat$d.correct, nn = 0.95,
+                     verbose = FALSE, maxit = 250, maxk = 8200)
+
+## validated inf criterion for choosing dimensions (the smaller the better)
+hiermod$vic
+
+
+cbind(hiermod$beta[[4]], NA, dat$beta[[4]])
+
+## angles between estimated and true subspaces for each population:
+mapply(function(x,y) angle(x,y), hiermod$beta, dat$beta)
+
 
 }
