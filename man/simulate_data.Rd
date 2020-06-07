@@ -35,8 +35,8 @@ Simulates data with hierarchical subspaces. Data are generated with two factors 
 
 library(hierSDR)
 
-set.seed(1)
-dat <- simulate_data(nobs = 100, nvars = 10,
+set.seed(123)
+dat <- simulate_data(nobs = 100, nvars = 6,
                      x.type = "some_categorical",
                      sd.y = 1, model = 2)
 

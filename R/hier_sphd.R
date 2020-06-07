@@ -44,7 +44,7 @@
 #' library(hierSDR)
 #'
 #' set.seed(123)
-#' dat <- simulate_data(nobs = 200, nvars = 10,
+#' dat <- simulate_data(nobs = 200, nvars = 6,
 #'                      x.type = "some_categorical",
 #'                      sd.y = 1, model = 2)
 #'
@@ -72,6 +72,9 @@
 #'
 #' ## angles between estimated and true subspaces for each population:
 #' mapply(function(x,y) angle(x,y), hiermod$beta, dat$beta)
+#'
+#' ## projection difference norm between estimated and true subspaces for each population:
+#' mapply(function(x,y) projnorm(x,y), hiermod$beta, dat$beta)
 #'
 #'
 hier.sphd <- function(x, y, z, z.combinations, d,

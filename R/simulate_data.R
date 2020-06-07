@@ -17,8 +17,8 @@
 #'
 #' library(hierSDR)
 #'
-#' set.seed(1)
-#' dat <- simulate_data(nobs = 100, nvars = 10,
+#' set.seed(123)
+#' dat <- simulate_data(nobs = 100, nvars = 6,
 #'                      x.type = "some_categorical",
 #'                      sd.y = 1, model = 2)
 #'
@@ -162,9 +162,9 @@ simulate_data <- function(nobs,
                           runif(ceiling(nvars / 2), min = 0, max = 0.5) * (2 * rbinom(ceiling(nvars / 2), 1, 0.5) - 1)), ncol = 1)
 
 
-    # beta.none[1:ncol(beta.none),] <- diag(ncol(beta.none))
-    # eta.a[1:ncol(eta.a),]         <- diag(ncol(eta.a))
-    # eta.ab[1:ncol(eta.ab),]       <- diag(ncol(eta.ab))
+    beta.none[1:ncol(beta.none),] <- 0.5*diag(ncol(beta.none))
+    eta.a[1:ncol(eta.a),]         <- 0.5*diag(ncol(eta.a))
+    eta.ab[1:ncol(eta.ab),]       <- 0.5*diag(ncol(eta.ab))
 
     beta.none <- grassmannify(beta.none)$beta
     eta.a     <- grassmannify(eta.a)$beta
@@ -187,12 +187,6 @@ simulate_data <- function(nobs,
     }
 
     beta.true.list <- list(none = beta.none, a = beta.a, b = beta.b, ab = beta.ab)
-
-
-    beta.none <- beta.none / 4
-    beta.a    <- beta.a / 4
-    beta.b    <- beta.b / 4
-    beta.ab   <- beta.ab / 4
 
     if (model.num == 1)
     {
