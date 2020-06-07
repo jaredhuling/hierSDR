@@ -12,7 +12,7 @@ angle(B1, B2)
 \item{B2}{second matrix}
 }
 \description{
-Measures angle between two subspaces
+Measures angle between two subspaces. Smallest value is 0, largest is 90
  from http://www4.stat.ncsu.edu/~li/software/GroupDR.R
  http://lexinli.biostat.berkeley.edu/softwares/dr/GroupDR.R
 }
