@@ -507,6 +507,10 @@ Proj <- function(b) b %*% solve(crossprod(b), t(b))
 #' b2 <- matrix(rnorm(10 * 2), ncol = 2)
 #' projnorm(b1, b2)
 #'
+#' ## angle here should be smalls
+#' b1 <- matrix(rnorm(10 * 2), ncol = 2)
+#' b2 <- b1 + matrix(rnorm(10 * 2, sd = 0.2), ncol = 2)
+#' projnorm(b1, b2)
 projnorm <- function(B1, B2)
 {
     norm(Proj(B1) - Proj(B2), type = "F")
@@ -520,8 +524,15 @@ projnorm <- function(B1, B2)
 #' @param B2 second matrix
 #' @export
 #' @examples
+#'
+#' ## case where any relation between b1 and b2 is random
 #' b1 <- matrix(rnorm(10 * 2), ncol = 2)
 #' b2 <- matrix(rnorm(10 * 2), ncol = 2)
+#' angle(b1, b2)
+#'
+#' ## angle here should be smalls
+#' b1 <- matrix(rnorm(10 * 2), ncol = 2)
+#' b2 <- b1 + matrix(rnorm(10 * 2, sd = 0.2), ncol = 2)
 #' angle(b1, b2)
 angle <- function(B1, B2)
 {

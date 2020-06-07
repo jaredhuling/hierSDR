@@ -17,7 +17,14 @@ Measures angle between two subspaces. Smallest value is 0, largest is 90
  http://lexinli.biostat.berkeley.edu/softwares/dr/GroupDR.R
 }
 \examples{
+
+## case where any relation between b1 and b2 is random
 b1 <- matrix(rnorm(10 * 2), ncol = 2)
 b2 <- matrix(rnorm(10 * 2), ncol = 2)
+angle(b1, b2)
+
+## angle here should be smalls
+b1 <- matrix(rnorm(10 * 2), ncol = 2)
+b2 <- b1 + matrix(rnorm(10 * 2, sd = 0.2), ncol = 2)
 angle(b1, b2)
 }

@@ -19,4 +19,8 @@ b1 <- matrix(rnorm(10 * 2), ncol = 2)
 b2 <- matrix(rnorm(10 * 2), ncol = 2)
 projnorm(b1, b2)
 
+## angle here should be smalls
+b1 <- matrix(rnorm(10 * 2), ncol = 2)
+b2 <- b1 + matrix(rnorm(10 * 2, sd = 0.2), ncol = 2)
+projnorm(b1, b2)
 }
