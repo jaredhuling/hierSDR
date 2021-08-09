@@ -13,9 +13,9 @@ covariates and outcome where the heterogeneity is based on all
 combinations of a set of binary factors. A motivating example is
 modeling health risks based on covariates where the relationship between
 covariates and outcome changes depending on what combination of chronic
-conditions a patient has. Here, the chronic conditions are the factors
-that drive heterogeneity. Each subpopulation is the set of patients with
-a different combination of chronic conditions.
+conditions a patient has. In this example the chronic conditions are the
+factors that drive heterogeneity. Each subpopulation is the set of
+patients with a different combination of chronic conditions.
 
 ## Installation
 
