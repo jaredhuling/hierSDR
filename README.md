@@ -6,7 +6,16 @@
 <!-- badges: start -->
 <!-- badges: end -->
 
-The goal of hierSDR is to …
+The `hierSDR` package implements the methodology of Huling and Yu
+(2021+) which is a semiparametric sufficient dimension reduction
+approach that handles heterogeneity in the relationship between
+covariates and outcome where the heterogeneity is based on all
+combinations of a set of binary factors. A motivating example is
+modeling health risks based on covariates where the relationship between
+covariates and outcome changes depending on what combination of chronic
+conditions a patient has. Here, the chronic conditions are the factors
+that drive heterogeneity. Each subpopulation is the set of patients with
+a different combination of chronic conditions.
 
 ## Installation
 
@@ -145,3 +154,17 @@ mapply(function(x,y) projnorm(x,y), hiermod$beta, dat$beta)
 #>       0,0       1,0       0,1       1,1 
 #> 0.2781362 0.2781362 0.2781362 0.3871345
 ```
+
+## References
+
+<div id="refs" class="references csl-bib-body hanging-indent">
+
+<div id="ref-huling21semiparametric" class="csl-entry">
+
+Huling, Jared D., and Menggang Yu. 2021+. “Sufficient Dimension
+Reduction for Populations with Structured Heterogeneity.” *Biometrics*,
+2021+.
+
+</div>
+
+</div>
