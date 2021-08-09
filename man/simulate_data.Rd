@@ -26,7 +26,7 @@ the other half are binary with dependencies on the continuous covariates)}
 
 \item{rho}{correlation parameter for AR-1 covariance structure for continuous covariates}
 
-\item{model}{model number used, either "1", "2", or "3"}
+\item{model}{model number used, either "1", "2", or "3", each corresponds to a different outcome model setting}
 }
 \description{
 Simulates data with hierarchical subspaces. Data are generated with two factors that induce heterogeneity

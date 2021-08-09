@@ -60,16 +60,16 @@ opt.est.eqn <- function(init, est.eqn, est.eqn.grad,
         if (optimize.nn) slver$par <- slver$par[-1]
     } else if (opt.method == "bfgs.x")
     {
-        slver <-   optimx(par     = init.par,
-                          fn      = est.eqn,
-                          #gr      = est.eqn.grad,
-                          control = list(trace = 1 * verbose,
-                                         maxit = maxit,
-                                         reltol = tol,
-                                         kkt = FALSE),
-                          method  = "BFGS",
-                          nn.val  = nn,
-                          optimize.nn = optimize.nn)
+        slver <-   optimx::optimx(par     = init.par,
+                                  fn      = est.eqn,
+                                  #gr      = est.eqn.grad,
+                                  control = list(trace = 1 * verbose,
+                                                 maxit = maxit,
+                                                 reltol = tol,
+                                                 kkt = FALSE),
+                                  method  = "BFGS",
+                                  nn.val  = nn,
+                                  optimize.nn = optimize.nn)
         if (is.null(slver$par) & names(slver)[1] == "p1")
         {
             if (optimize.nn)
@@ -88,16 +88,16 @@ opt.est.eqn <- function(init, est.eqn, est.eqn.grad,
     } else if (opt.method == "lbfgs.x")
     {
 
-        slver <-   optimx(par     = init.par, # c(log(nn / (1 - nn)), init.par),
-                          fn      = est.eqn,
-                          #gr      = est.eqn.grad,
-                          control = list(trace = 1 * verbose,
-                                         maxit = maxit,
-                                         factr = tol,
-                                         kkt = FALSE),
-                          method  = "L-BFGS-B",
-                          nn.val  = nn,
-                          optimize.nn = optimize.nn)
+        slver <-   optimx::optimx(par     = init.par, # c(log(nn / (1 - nn)), init.par),
+                                  fn      = est.eqn,
+                                  #gr      = est.eqn.grad,
+                                  control = list(trace = 1 * verbose,
+                                                 maxit = maxit,
+                                                 factr = tol,
+                                                 kkt = FALSE),
+                                  method  = "L-BFGS-B",
+                                  nn.val  = nn,
+                                  optimize.nn = optimize.nn)
         if (is.null(slver$par) & names(slver)[1] == "p1")
         {
             if (optimize.nn)
@@ -115,15 +115,15 @@ opt.est.eqn <- function(init, est.eqn, est.eqn.grad,
         }
     } else
     {
-        slver <-   optimx(par     = init.par,
-                          fn      = est.eqn,
-                          #gr      = est.eqn.grad,
-                          control = list(trace = 1 * verbose,
-                                         maxit = maxit,
-                                         kkt = FALSE),
-                          method  = opt.method,
-                          nn.val  = nn,
-                          optimize.nn = optimize.nn)
+        slver <-   optimx::optimx(par     = init.par,
+                                  fn      = est.eqn,
+                                  #gr      = est.eqn.grad,
+                                  control = list(trace = 1 * verbose,
+                                                 maxit = maxit,
+                                                 kkt = FALSE),
+                                  method  = opt.method,
+                                  nn.val  = nn,
+                                  optimize.nn = optimize.nn)
         if (is.null(slver$par) & names(slver)[1] == "p1")
         {
             if (optimize.nn)

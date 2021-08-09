@@ -2,7 +2,7 @@
 % Please edit documentation in R/hier_sphd.R
 \name{hier.sphd}
 \alias{hier.sphd}
-\title{Main hierarchical SDR fitting function}
+\title{Main hierarchical sufficient dimension reduction fitting function}
 \usage{
 hier.sphd(
   x,
@@ -28,6 +28,7 @@ hier.sphd(
   verbose = TRUE,
   degree = 2,
   pooled = FALSE,
+  maxk = 5000,
   ...
 )
 }
@@ -71,6 +72,8 @@ for a principle Hessian directions initialization approach}
 
 \item{nn.try}{vector of nearest neighbor parameters for \code{\link[locfit]{locfit.raw}} to try in random initialization}
 
+\item{n.random}{integer number of random initializations for parameters to try}
+
 \item{optimize.nn}{should \code{nn} be optimized? Not recommended}
 
 \item{separate.nn}{should each subpopulation have its own \code{nn}? If \code{TRUE}, optimization takes
@@ -85,10 +88,12 @@ dimension reduction subspace? Recommended to set to \code{TRUE}}
 
 \item{pooled}{should the estimator be a pooled estimator?}
 
+\item{maxk}{maxk parameter for \code{\link[locfit]{locfit.raw}}. Set to a large number if an out of vertex space error occurs.}
+
 \item{...}{extra arguments passed to \code{\link[locfit]{locfit.raw}}}
 }
 \description{
-fits hierarchical SDR models
+fits hierarchically nested sufficient dimension reduction models
 }
 \examples{
 
@@ -112,7 +117,8 @@ dat$d.correct
 
 ## fit hier SPHD model:
 
-hiermod <- hier.sphd(x, y, z, dat$z.combinations, d = dat$d.correct, nn = 0.95,
+\dontrun{
+hiermod <- hier.sphd(x, y, z, dat$z.combinations, d = dat$d.correct,
                      verbose = FALSE, maxit = 250, maxk = 8200)
 
 ## validated inf criterion for choosing dimensions (the smaller the better)
@@ -126,6 +132,7 @@ mapply(function(x,y) angle(x,y), hiermod$beta, dat$beta)
 
 ## projection difference norm between estimated and true subspaces for each population:
 mapply(function(x,y) projnorm(x,y), hiermod$beta, dat$beta)
+}
 
 
 }

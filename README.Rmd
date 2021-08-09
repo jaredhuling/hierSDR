@@ -1,0 +1,98 @@
+---
+output: github_document
+---
+
+<!-- README.md is generated from README.Rmd. Please edit that file -->
+
+```{r, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>",
+  fig.path = "man/figures/README-",
+  out.width = "100%"
+)
+```
+
+# hierSDR
+
+<!-- badges: start -->
+<!-- badges: end -->
+
+The goal of hierSDR is to ...
+
+## Installation
+
+You can install the released version of hierSDR from [CRAN](https://CRAN.R-project.org) with:
+
+``` r
+install.packages("hierSDR")
+```
+
+And the development version from [GitHub](https://github.com/) with:
+
+``` r
+# install.packages("devtools")
+devtools::install_github("jaredhuling/hierSDR")
+```
+## Example
+
+This is a basic example which shows you how to solve a common problem:
+
+```{r loadpkg, warning=FALSE, message=FALSE}
+library(hierSDR)
+```
+
+Simulate data where response mean is generated from a multiple index
+model where each combination of a set of binary factors $Z$ has a 
+potentially different set of parameters in the multiple index model.
+Here, $Z$ drives heterogeneity in the relationship between covariates $X$
+and a response $Y$.
+
+```{r simdat}
+set.seed(123)
+dat <- simulate_data(nobs = 500, nvars = 6,
+                     x.type = "some_categorical",
+                     sd.y = 1, model = 2)
+
+x <- dat$x ## covariates
+z <- dat$z ## factor indicators, these drive heterogeneity in the data
+y <- dat$y ## response
+
+## true coefficients that generate the subspaces
+dat$beta 
+
+## what combinations of z represent different subpopulations
+dat$z.combinations 
+
+## correct structural dimensions:
+## (the dimensions of the subpopulation-specific
+##  central mean subspaces)
+dat$d.correct
+```
+
+Now estimate the parameters in the multiple index model where each combination of the factors in $Z$ has its own set of parameters, but the parameters are constrained so that the central mean subspaces (which convey the regression relationship information) are hierarchical according to the structure of the subpopulations defined by $Z$. 
+
+Here we are specifying the correct dimensions for each of the parameter matrices for each subpopulation. However, the correct dimensions can be estimated with a validated information criterion (VIC). 
+
+```{r}
+hiermod <- hier.sphd(x, y, z, dat$z.combinations, d = dat$d.correct,
+                     verbose = FALSE)
+
+
+## validated inf criterion for choosing dimensions 
+## (the smaller the better).
+## multiple models should be fit with differing dimensions and the
+## dimensions with the smallest VIC should be used
+hiermod$vic
+
+## true and estimated parameters
+cbind(Estimated = hiermod$beta[[4]], NA, Truth = dat$beta[[4]])
+
+## angles between estimated and true subspaces for each subpopulation:
+## (smaller means the subspaces are better estimated)
+mapply(function(x,y) angle(x,y), hiermod$beta, dat$beta)
+
+## projection difference norm between estimated and true subspaces for each population:
+## (smaller means the subspaces are better estimated)
+mapply(function(x,y) projnorm(x,y), hiermod$beta, dat$beta)
+```

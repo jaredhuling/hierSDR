@@ -1,9 +1,9 @@
 
 
 
-#' Main hierarchical SDR fitting function
+#' Main hierarchical sufficient dimension reduction fitting function
 #'
-#' @description fits hierarchical SDR models
+#' @description fits hierarchically nested sufficient dimension reduction models
 #'
 #' @param x an n x p matrix of covariates, where each row is an observation and each column is a predictor
 #' @param y vector of responses of length n
@@ -28,6 +28,8 @@
 #' @param vic logical value of whether or not to compute the VIC criterion for dimension determination
 #' @param grassmann logical value of whether or not to enforce parameters to be on the Grassmann manifold
 #' @param nn nearest neighbor parameter for \code{\link[locfit]{locfit.raw}}
+#' @param maxk maxk parameter for \code{\link[locfit]{locfit.raw}}. Set to a large number if an out of vertex space error occurs.
+#' @param n.random integer number of random initializations for parameters to try
 #' @param nn.try vector of nearest neighbor parameters for \code{\link[locfit]{locfit.raw}} to try in random initialization
 #' @param optimize.nn should \code{nn} be optimized? Not recommended
 #' @param separate.nn should each subpopulation have its own \code{nn}? If \code{TRUE}, optimization takes
@@ -61,7 +63,8 @@
 #'
 #' ## fit hier SPHD model:
 #'
-#' hiermod <- hier.sphd(x, y, z, dat$z.combinations, d = dat$d.correct, nn = 0.95,
+#' \dontrun{
+#' hiermod <- hier.sphd(x, y, z, dat$z.combinations, d = dat$d.correct,
 #'                      verbose = FALSE, maxit = 250, maxk = 8200)
 #'
 #' ## validated inf criterion for choosing dimensions (the smaller the better)
@@ -75,6 +78,7 @@
 #'
 #' ## projection difference norm between estimated and true subspaces for each population:
 #' mapply(function(x,y) projnorm(x,y), hiermod$beta, dat$beta)
+#' }
 #'
 #'
 hier.sphd <- function(x, y, z, z.combinations, d,
@@ -103,6 +107,7 @@ hier.sphd <- function(x, y, z, z.combinations, d,
                       verbose               = TRUE,     # should messages be printed out during optimization?
                       degree                = 2,        # degree of kernel
                       pooled                = FALSE,
+                      maxk = 5000,
                       ...)
 {
 
@@ -375,12 +380,16 @@ hier.sphd <- function(x, y, z, z.combinations, d,
             {
                 locfit.mod <- locfit.raw(x = dir.cur, y = y.list[[s]],
                                          kern = "trwt", kt = "prod",
-                                         alpha = c(exp(beta.vec[1]) / (1 + exp(beta.vec[1])), best.h), deg = degree, ...)
+                                         alpha = c(exp(beta.vec[1]) / (1 + exp(beta.vec[1])), best.h),
+                                         maxk = maxk,
+                                         deg = degree, ...)
             } else
             {
                 locfit.mod <- locfit.raw(x = dir.cur, y = y.list[[s]],
                                          kern = "trwt", kt = "prod",
-                                         alpha = c(nn.val[s], best.h), deg = degree, ...)
+                                         alpha = c(nn.val[s], best.h),
+                                         maxk = maxk,
+                                         deg = degree, ...)
             }
 
 
@@ -460,17 +469,17 @@ hier.sphd <- function(x, y, z, z.combinations, d,
             if (optimize.nn)
             {
                 locfit.mod <- locfit.raw(x = dir.cur, y = y.list[[s]],
-                                         kern = "trwt", kt = "prod",
+                                         kern = "trwt", kt = "prod", maxk = maxk,
                                          alpha = c(exp(beta.vec[1]) / (1 + exp(beta.vec[1])), best.h), deg = degree, ...)
             } else
             {
                 locfit.mod <- locfit.raw(x = dir.cur, y = y.list[[s]],
-                                         kern = "trwt", kt = "prod",
+                                         kern = "trwt", kt = "prod", maxk = maxk,
                                          alpha = c(nn.val[s], best.h), deg = degree, ...)
             }
 
             # locfit.mod <- locfit.raw(x = dir.cur, y = y[strata.idx],
-            #                          kern = "trwt", kt = "prod",
+            #                          kern = "trwt", kt = "prod", maxk = maxk,
             #                          alpha = best.h, deg = 2, ...)
 
             Ey.given.xbeta[strata.idx] <- fitted(locfit.mod)
@@ -546,7 +555,7 @@ hier.sphd <- function(x, y, z, z.combinations, d,
             best.h <- sd * (0.75 * nrow(dir.cur)) ^ (-1 / (ncol(dir.cur) + 4) )
 
             locfit.mod <- locfit.raw(x = dir.cur, y = y.list[[s]],
-                                     kern = "trwt", kt = "prod",
+                                     kern = "trwt", kt = "prod", maxk = maxk,
                                      alpha = c(nn.val[s], best.h), deg = degree, ...)
 
 

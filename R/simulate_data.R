@@ -11,7 +11,9 @@
 #' the other half are binary with dependencies on the continuous covariates)
 #' @param sd.y standard deviation of responsee
 #' @param rho correlation parameter for AR-1 covariance structure for continuous covariates
-#' @param model model number used, either "1", "2", or "3"
+#' @param model model number used, either "1", "2", or "3", each corresponds to a different outcome model setting
+#' @importFrom stats rnorm var
+#' @importFrom MASS mvrnorm
 #' @export
 #' @examples
 #'

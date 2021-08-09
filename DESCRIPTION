@@ -1,11 +1,11 @@
 Package: hierSDR
 Type: Package
-Title: Hierarchical Sufficient Dimension Reduction
+Title: Hierarchical Sufficient Dimension Reduction for Heterogeneous Populations
 Version: 0.1
 Authors@R: c(
     person("Jared", "Huling",  role = c("aut", "cre"), email = "jaredhuling@gmail.com")
     )
-Description: Provides semiparametric estimation of hierarchical SDR models.
+Description: Provides semiparametric sufficient dimension reduction for central mean subspaces for heterogeneous data defined by combinations of binary factors (such as chronic conditions). Subspaces are estimated to be hierarchically nested to respect the structure of subpopulations with overlapping characteristics. 
 License: GPL-2
 Encoding: UTF-8
 Depends:
@@ -13,9 +13,9 @@ Depends:
     MASS,
     Matrix,
     locfit,
-    numDeriv,
-    optimx,
-    BB,
     lbfgs
+Imports:
+    numDeriv,
+    optimx
 LazyData: TRUE
 RoxygenNote: 7.1.1
