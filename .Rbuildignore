@@ -17,3 +17,4 @@ src/old
 docs
 ^_pkgdown\.yml$
 ^README\.Rmd$
+references.bib
