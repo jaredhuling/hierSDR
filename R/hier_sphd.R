@@ -40,6 +40,24 @@
 #' @param degree degree of kernel to use
 #' @param pooled should the estimator be a pooled estimator?
 #' @param ... extra arguments passed to \code{\link[locfit]{locfit.raw}}
+#' @return A list with the following elements
+#' \itemize{
+#' \item beta a list of estimated sufficient dimension reduction matrices, one for each subpopulation
+#' \item beta.init a list of the initial sufficient dimension reduction matrices, one for each subpopulation -- do not use, just for the sake of comparisons
+#' \item directions a list of estimated sufficient dimension reduction directions (i.e. the reduced dimension predictors/variables), one for each subpopulation.
+#' These have number of rows equal to the sample size for the subpopulation and number of columns equal to the specified dimensions of the reduced dimension spaces.
+#' \item y.list a list of vectors of responses for each subpopulation
+#' \item z.combinations the \code{z.combinations} specified as an input
+#' \item cov list of variance covariance matrices for the covariates for each subpopulation
+#' \item sqrt.inv.cov list of inverse square roots of the variance covariance matrices for the covariates for each subpopulation. These are used for scaling
+#' \item solver.obj object returned by the solver/optimization function
+#' \item value value of the objective function at the solution
+#' \item value.init value of the objective function at the initial beta (\code{beta.init}) used
+#' \item vic.est.eqn the average (unpenalized) VIC value  across the r different input values. This assesses model fit
+#' \item vic.eqns the individual (unpenalized) VIC values across the r input values. Not used.
+#' \item vic the penalized VIC value. This is used for dimension selection, with dimensions chosen by the set of dimensions
+#' that minimize this penalized vic value that trades off model complexity and model fit
+#' }
 #' @export
 #' @examples
 #'
@@ -63,7 +81,7 @@
 #'
 #' ## fit hier SPHD model:
 #'
-#' \dontrun{
+#' \donttest{
 #' hiermod <- hier.sphd(x, y, z, dat$z.combinations, d = dat$d.correct,
 #'                      verbose = FALSE, maxit = 250, maxk = 8200)
 #'
@@ -772,6 +790,7 @@ hier.sphd <- function(x, y, z, z.combinations, d,
 #' @param x fitted object returned by \code{\link[hierSDR]{hier.sphd}}
 #' @param ... not used
 #' @seealso \code{\link[hierSDR]{hier.sphd}} for function which fits hierarchical SDR model
+#' @return No return value, called for side effects
 #' @rdname plot
 #' @export
 #' @examples
@@ -785,6 +804,10 @@ plot.hier_sdr_fit <- function(x, ...)
     dimensions   <- sapply(x$beta, ncol)
 
     maxd <- max(dimensions)
+
+    oldpar <- par(no.readonly = TRUE)    # code line i
+    on.exit(par(oldpar))            # code line i + 1
+
     par(mfrow = c(n.subpops, maxd))
 
     rbPal <- colorRampPalette(c('red','blue'))

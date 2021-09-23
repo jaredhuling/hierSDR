@@ -14,6 +14,16 @@
 #' @param model model number used, either "1", "2", or "3", each corresponds to a different outcome model setting
 #' @importFrom stats rnorm var
 #' @importFrom MASS mvrnorm
+#' @return A list with the following elements
+#' \itemize{
+#' \item x a matrix of covariates with number of rows equal to the total sample size and columns equal to the number of variables
+#' \item z a matrix with number of rows equal to the total sample size and columns as dummy variables indicating presence of a stratifying factor
+#' \item y a vector of all responses
+#' \item beta a list of the true sufficient dimension reduction matrices, one for each subpopulation
+#' \item z.combinations all possible combinations of the stratifying factors \code{z}
+#' \item snr scalar the observed signal-to-noise ratio for the response
+#' \item d.correct the true dimensions of the dimension reduction spaces
+#' }
 #' @export
 #' @examples
 #'
@@ -231,6 +241,11 @@ simulate_data <- function(nobs,
     colnames(z.combinations) <- colnames(z) <- c("a", "b")
 
 
-    list(x = x.tall, z = z, y = drop(y), beta = beta.true.list, snr = snr, z.combinations = z.combinations,
+    list(x = x.tall,
+         z = z,
+         y = drop(y),
+         beta = beta.true.list,
+         snr = snr,
+         z.combinations = z.combinations,
          d.correct = d.correct)
 }

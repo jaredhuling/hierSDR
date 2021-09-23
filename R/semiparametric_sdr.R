@@ -97,6 +97,15 @@ Kepanechnikov2 <- function(u) 0.75 * (1 - (u) ^ 2)
 #' @param x an n x p matrix of covariates, where each row is an observation and each column is a predictor
 #' @param y vector of responses of length n
 #' @param d an integer representing the structural dimension
+#' @return A list with the following elements
+#' \itemize{
+#' \item beta.hat estimated sufficient dimension reduction matrix
+#' \item eta.hat coefficients on the scale of the scaled covariates
+#' \item cov variance covariance matric for the covariates
+#' \item sqrt.inv.cov inverse square root of the variance covariance matrix for the covariates. Used for scaling
+#' \item M matrix from principal Hessian directions
+#' \item eigenvalues eigenvalues of the M matrix
+#' }
 #' @export
 phd <- function(x, y, d = 5L)
 {
@@ -117,7 +126,12 @@ phd <- function(x, y, d = 5L)
     eig.V    <- eigen(V.hat)
     eta.hat  <- eig.V$vectors[,1:d]
     beta.hat <- t(t(eta.hat) %*% sqrt.inv.cov)
-    list(beta.hat = beta.hat, eta.hat = eta.hat, M = V.hat, cov = cov, sqrt.inv.cov = sqrt.inv.cov, eigenvalues = eig.V$values)
+    list(beta.hat = beta.hat,
+         eta.hat = eta.hat,
+         M = V.hat,
+         cov = cov,
+         sqrt.inv.cov = sqrt.inv.cov,
+         eigenvalues = eig.V$values)
 }
 
 
@@ -141,6 +155,16 @@ phd <- function(x, y, d = 5L)
 #' @param verbose should results be printed along the way?
 #' @param degree degree of kernel to use
 #' @param ... extra arguments passed to \code{\link[locfit]{locfit.raw}}
+#' @return A list with the following elements
+#' \itemize{
+#' \item beta estimated sufficient dimension reduction matrix
+#' \item beta.init initial sufficient dimension reduction matrix -- do not use, just for the sake of comparisons
+#' \item cov variance covariance matric for the covariates
+#' \item sqrt.inv.cov inverse square root of the variance covariance matrix for the covariates. Used for scaling
+#' \item solver.obj object returned by the solver/optimization function
+#' \item vic the penalized VIC value. This is used for dimension selection, with dimension chosen to
+#' minimize this penalized vic value that trades off model complexity and model fit
+#' }
 #' @export
 semi.phd <- function(x, y, d = 5L, maxit = 100L, h = NULL,
                      opt.method = c("lbfgs.x", "bfgs", "lbfgs2",
@@ -461,6 +485,16 @@ sir <- function(x, y, h = 10L, d = 5L, slice.ind = NULL)
 #' dimension reduction subspace? Recommended to set to \code{TRUE}
 #' @param pooled should the estimator be a pooled estimator?
 #' @param ... not used
+#' @return A list with the following elements
+#' \itemize{
+#' \item beta a list of estimated sufficient dimension reduction matrices, one for each subpopulation
+#' \item directions a list of estimated sufficient dimension reduction directions (i.e. the reduced dimension predictors/variables), one for each subpopulation.
+#' These have number of rows equal to the sample size for the subpopulation and number of columns equal to the specified dimensions of the reduced dimension spaces.
+#' \item y.list a list of vectors of responses for each subpopulation
+#' \item z.combinations the \code{z.combinations} specified as an input
+#' \item cov list of variance covariance matrices for the covariates for each subpopulation
+#' \item sqrt.inv.cov list of inverse square roots of the variance covariance matrices for the covariates for each subpopulation. These are used for scaling
+#' }
 #' @export
 #' @examples
 #'

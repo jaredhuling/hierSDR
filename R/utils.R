@@ -501,6 +501,7 @@ Proj <- function(b) b %*% solve(crossprod(b), t(b))
 #' @description Measures distance between two subspaces
 #' @param B1 first matrix
 #' @param B2 second matrix
+#' @return scalar value of the projection difference norm between \code{B1} and \code{B2}
 #' @export projnorm
 #' @examples
 #' b1 <- matrix(rnorm(10 * 2), ncol = 2)
@@ -522,6 +523,7 @@ projnorm <- function(B1, B2)
 #'  http://lexinli.biostat.berkeley.edu/softwares/dr/GroupDR.R
 #' @param B1 first matrix
 #' @param B2 second matrix
+#' @return scalar value of the angle between \code{B1} and \code{B2}
 #' @export
 #' @examples
 #'
@@ -530,7 +532,7 @@ projnorm <- function(B1, B2)
 #' b2 <- matrix(rnorm(10 * 2), ncol = 2)
 #' angle(b1, b2)
 #'
-#' ## angle here should be smalls
+#' ## angle here should be small
 #' b1 <- matrix(rnorm(10 * 2), ncol = 2)
 #' b2 <- b1 + matrix(rnorm(10 * 2, sd = 0.2), ncol = 2)
 #' angle(b1, b2)
