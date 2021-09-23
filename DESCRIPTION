@@ -5,7 +5,8 @@ Version: 0.1
 Authors@R: c(
     person("Jared", "Huling",  role = c("aut", "cre"), email = "jaredhuling@gmail.com")
     )
-Description: Provides semiparametric sufficient dimension reduction for central mean subspaces for heterogeneous data defined by combinations of binary factors (such as chronic conditions). Subspaces are estimated to be hierarchically nested to respect the structure of subpopulations with overlapping characteristics. 
+Description: Provides semiparametric sufficient dimension reduction for central mean subspaces for heterogeneous data defined by combinations of binary factors (such as chronic conditions). Subspaces are estimated to be hierarchically nested to respect the structure of subpopulations with overlapping characteristics. This package is an implementation of the proposed methodology of Huling and Yu (2021) <doi:10.1111/biom.13546>.
+BugReports: https://github.com/jaredhuling/hierSDR/issues
 License: GPL-2
 Encoding: UTF-8
 Depends:
