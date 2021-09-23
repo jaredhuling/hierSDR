@@ -13,6 +13,17 @@ phd(x, y, d = 5L)
 
 \item{d}{an integer representing the structural dimension}
 }
+\value{
+A list with the following elements
+\itemize{
+\item beta.hat estimated sufficient dimension reduction matrix
+\item eta.hat coefficients on the scale of the scaled covariates
+\item cov variance covariance matric for the covariates
+\item sqrt.inv.cov inverse square root of the variance covariance matrix for the covariates. Used for scaling
+\item M matrix from principal Hessian directions
+\item eigenvalues eigenvalues of the M matrix
+}
+}
 \description{
 fits SDR models (PHD approach)
 }

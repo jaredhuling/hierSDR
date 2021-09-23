@@ -43,6 +43,18 @@ dimension reduction subspace? Recommended to set to \code{TRUE}}
 
 \item{...}{not used}
 }
+\value{
+A list with the following elements
+\itemize{
+\item beta a list of estimated sufficient dimension reduction matrices, one for each subpopulation
+\item directions a list of estimated sufficient dimension reduction directions (i.e. the reduced dimension predictors/variables), one for each subpopulation.
+These have number of rows equal to the sample size for the subpopulation and number of columns equal to the specified dimensions of the reduced dimension spaces.
+\item y.list a list of vectors of responses for each subpopulation
+\item z.combinations the \code{z.combinations} specified as an input
+\item cov list of variance covariance matrices for the covariates for each subpopulation
+\item sqrt.inv.cov list of inverse square roots of the variance covariance matrices for the covariates for each subpopulation. These are used for scaling
+}
+}
 \description{
 fits hierarchical SDR models
 }

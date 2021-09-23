@@ -11,6 +11,9 @@ projnorm(B1, B2)
 
 \item{B2}{second matrix}
 }
+\value{
+scalar value of the projection difference norm between \code{B1} and \code{B2}
+}
 \description{
 Measures distance between two subspaces
 }

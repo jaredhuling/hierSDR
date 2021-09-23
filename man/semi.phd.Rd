@@ -53,6 +53,18 @@ for a principle Hessian directions initialization approach}
 
 \item{...}{extra arguments passed to \code{\link[locfit]{locfit.raw}}}
 }
+\value{
+A list with the following elements
+\itemize{
+\item beta estimated sufficient dimension reduction matrix
+\item beta.init initial sufficient dimension reduction matrix -- do not use, just for the sake of comparisons
+\item cov variance covariance matric for the covariates
+\item sqrt.inv.cov inverse square root of the variance covariance matrix for the covariates. Used for scaling
+\item solver.obj object returned by the solver/optimization function
+\item vic the penalized VIC value. This is used for dimension selection, with dimension chosen to
+minimize this penalized vic value that trades off model complexity and model fit
+}
+}
 \description{
 fits semiparametric SDR models (PHD approach)
 }
